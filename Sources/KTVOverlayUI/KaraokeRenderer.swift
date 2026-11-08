@@ -86,19 +86,23 @@ struct KaraokeRenderer {
         let credits = (content.artist.map { [Self.originalArtistLabel + $0] } ?? []) + content.credits
         let lineHeight = em * Self.creditSpacing
         let boxLeft = (canvas.width - em * Self.minBoxWidth) / 2
-        let creditInk = content.usesRedTitle ? titleInk(Self.blueTitleFill) : unsungInk
+        let creditInk = usesClassicTitle && content.usesRedTitle ? Ink.sung(style) : unsungInk
         for (position, text) in credits.reversed().enumerated() {
             let y = Self.creditsBottom + CGFloat(position) * lineHeight
             let font = fitted(text, size: em * Self.creditScale, maxWidth: canvas.width - boxLeft - Self.sideMargin)
             OutlinedText.draw(text, at: NSPoint(x: boxLeft, y: y), font: font, ink: creditInk)
         }
-        let fill = content.usesRedTitle ? Self.redTitleFill : Self.blueTitleFill
         let titleY = Self.creditsBottom + Self.titleGap + CGFloat(credits.count) * lineHeight
-        drawCentered(.unsung(content.title), y: titleY, size: em * Self.titleScale, ink: titleInk(fill))
+        drawCentered(.unsung(content.title), y: titleY, size: em * Self.titleScale, ink: titleInk)
     }
 
-    private func titleInk(_ fill: RGBAColor) -> Ink {
-        Ink(fill: fill, stroke: Self.titleStroke, strokeWidth: style.strokeWidth)
+    /// The red and blue title colours belong to the classic preset; other presets use their sung colours.
+    private var usesClassicTitle: Bool { settings.preset == .classic }
+
+    private var titleInk: Ink {
+        guard usesClassicTitle else { return .sung(style) }
+        let fill = content.usesRedTitle ? Self.redTitleFill : Self.blueTitleFill
+        return Ink(fill: fill, stroke: Self.titleStroke, strokeWidth: style.strokeWidth)
     }
 
     // MARK: Layout

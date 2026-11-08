@@ -6,6 +6,11 @@ import Testing
 @Suite struct RenderingTests {
     // Classic sung fill, 0x1746E0.
     private let sungBlue = (r: 0x17, g: 0x46, b: 0xE0)
+    private let lightTitleBlue = (r: 0x35, g: 0xA7, b: 0xF0)
+    private let redTitle = (r: 0xE5, g: 0x20, b: 0x2A)
+    private let goldSung = (r: 0xFF, g: 0xB5, b: 0x16)
+    // Credits fill the bottom 110 points; the title sits above them.
+    private let creditTopPoints = 110.0
     private let canvas = CGSize(width: 1200, height: 320)
 
     @Test @MainActor func idleIsFullyTransparent() {
@@ -40,6 +45,20 @@ import Testing
 
     @Test @MainActor func titleCardDraws() {
         #expect(render(.title).maxAlpha > 0)
+    }
+
+    @Test @MainActor func classicRedTitleCreditsUseTheSungBlue() {
+        let img = render(.title)
+        #expect(img.count(of: sungBlue, inRowsFromBottom: creditRows(img)) > 0)
+        #expect(img.count(of: lightTitleBlue, inRowsFromBottom: creditRows(img)) == 0)
+        #expect(img.count(of: redTitle, inRowsFromBottom: titleRows(img)) > 0)
+    }
+
+    @Test @MainActor func goldTitleUsesItsSungColourNotTheClassicRed() {
+        let gold = OverlaySettings.defaults.with(\.preset, .gold).with(\.style, StylePreset.gold.style)
+        let img = render(.title, settings: gold)
+        #expect(img.count(of: goldSung, inRowsFromBottom: titleRows(img)) > 0)
+        #expect(img.count(of: redTitle, inRowsFromBottom: 0...img.height) == 0)
     }
 
     @Test @MainActor func countdownDraws() {
@@ -87,6 +106,10 @@ import Testing
 
     // MARK: Helpers
 
+    private func scale(_ img: RenderedImage) -> Double { Double(img.width) / canvas.width }
+    private func creditRows(_ img: RenderedImage) -> ClosedRange<Int> { 0...Int(creditTopPoints * scale(img)) }
+    private func titleRows(_ img: RenderedImage) -> ClosedRange<Int> { Int(creditTopPoints * scale(img))...img.height }
+
     @MainActor private func render(
         _ scene: KaraokeScene,
         line: String = "測試字幕一二三四",
@@ -115,7 +138,7 @@ private struct RenderedImage {
     private static let tolerance = 8
     private static let midpointMargin = 6
     let width: Int
-    private let height: Int
+    let height: Int
     private let pixels: [UInt8]
 
     init(_ rep: NSBitmapImageRep) {
@@ -156,6 +179,15 @@ private struct RenderedImage {
             : (mid + Self.midpointMargin)...columns.upperBound
         return range.reduce(0) { total, x in
             total + (0..<height).filter { matches(color, x: x, y: $0) }.count
+        }
+    }
+
+    /// Matches inside rows counted up from the bottom edge, across the whole width.
+    func count(of color: (r: Int, g: Int, b: Int), inRowsFromBottom rows: ClosedRange<Int>) -> Int {
+        let top = max(0, height - 1 - rows.upperBound), bottom = min(height - 1, height - 1 - rows.lowerBound)
+        guard top <= bottom else { return 0 }
+        return (top...bottom).reduce(0) { total, y in
+            total + (0..<width).filter { matches(color, x: $0, y: y) }.count
         }
     }
 
