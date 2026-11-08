@@ -32,4 +32,6 @@ public enum LyricsTiming {
     public static let matchSameArtistSeconds: Double = 3
     /// Duration tolerance (seconds) for a lyrics candidate whose artist differs or is missing.
     public static let matchOtherArtistSeconds: Double = 1
+    /// Median line-start difference (seconds) above which word timing and LRC lines are different versions.
+    public static let versionMismatchSeconds: Double = 1
 }
