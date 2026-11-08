@@ -36,6 +36,11 @@ public struct LyricsCache: Sendable {
         self.now = now
     }
 
+    /// A cache stored in the subdirectory `name`, so results found under different provider settings never mix.
+    public func scoped(_ name: String) -> LyricsCache {
+        LyricsCache(directory: directory.appendingPathComponent(name, isDirectory: true), now: now)
+    }
+
     /// The cached outcome, or nil when nothing usable is stored. Unreadable files are deleted and logged.
     public func load(_ query: TrackQuery) -> LyricsOutcome? {
         let url = fileURL(for: query)

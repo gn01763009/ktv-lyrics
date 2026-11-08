@@ -35,7 +35,8 @@ public final class AppCoordinator {
     }
 
     private let makeResolver: (Bool) -> any LyricsResolving
-    private let locator: LyricsLocator
+    private let baseCache: LyricsCache
+    private var locator: LyricsLocator
     private let overrides: SongOverrideStore
     private let clock: any PlayerClockReading
     private let runningApps: () -> Set<String>
@@ -66,13 +67,19 @@ public final class AppCoordinator {
         now: @escaping () -> Double
     ) {
         self.makeResolver = makeResolver
-        self.locator = LyricsLocator(cache: cache)
+        self.baseCache = cache
+        self.locator = LyricsLocator(cache: cache.scoped(Self.cacheScope(useNetEase: settings.useNetEase)))
         self.overrides = overrides
         self.settings = settings
         self.clock = clock
         self.runningApps = runningApps
         self.now = now
         self.resolver = makeResolver(settings.useNetEase)
+    }
+
+    /// The cache subdirectory for a NetEase setting. Lookups made with NetEase off are not trusted when it is on.
+    static func cacheScope(useNetEase: Bool) -> String {
+        useNetEase ? "netease-on" : "netease-off"
     }
 
     // MARK: - Events
@@ -118,10 +125,14 @@ public final class AppCoordinator {
     }
 
     public func apply(settings newSettings: OverlaySettings) {
-        if newSettings.useNetEase != settings.useNetEase {
+        let providersChanged = newSettings.useNetEase != settings.useNetEase
+        if providersChanged {
             resolver = makeResolver(newSettings.useNetEase)
+            locator = LyricsLocator(cache: baseCache.scoped(Self.cacheScope(useNetEase: newSettings.useNetEase)))
         }
         settings = newSettings
+        // Read the matching cache scope for the song on screen, unless its first lookup is still held back.
+        if providersChanged, let snapshot, lookupDeadline == nil { restartLookup(snapshot) }
     }
 
     /// Moves this song's lyrics by `delta` seconds (positive shows them earlier) and remembers it.
@@ -285,7 +296,7 @@ public final class AppCoordinator {
         offered = []
         lookupDeadline = nil
         if loaded == nil { lookup = .searching(since: now()) }
-        beginLookup(query: query, songOverride: songOverride, id: gate.currentID, cacheable: true)
+        beginLookup(query: query, songOverride: songOverride, id: gate.currentID, cacheable: snapshot.duration > 0)
     }
 
     /// The task is never cancelled: a cancelled network call would be cached as "not found".

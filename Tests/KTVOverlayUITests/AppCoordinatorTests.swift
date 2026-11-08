@@ -79,7 +79,9 @@ import Testing
         let clock: FakeClock
         let running: Box<Set<String>>
         let built: Box<[Bool]>
+        /// The cache scope that matches the settings the rig started with.
         let cache: LyricsCache
+        let baseCache: LyricsCache
         let overrides: SongOverrideStore
         let directory: URL
 
@@ -103,7 +105,8 @@ import Testing
         settings: OverlaySettings = .defaults
     ) -> Rig {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ktv-coordinator-\(UUID().uuidString)")
-        let cache = LyricsCache(directory: directory.appendingPathComponent("cache"))
+        let baseCache = LyricsCache(directory: directory.appendingPathComponent("cache"))
+        let cache = baseCache.scoped(AppCoordinator.cacheScope(useNetEase: settings.useNetEase))
         let overrides = SongOverrideStore(directory: directory.appendingPathComponent("overrides"))
         let time = Box(1_000.0)
         let clock = FakeClock()
@@ -114,7 +117,7 @@ import Testing
                 built.value.append(useNetEase)
                 return useNetEase ? on : off
             },
-            cache: cache,
+            cache: baseCache,
             overrides: overrides,
             settings: settings,
             clock: clock,
@@ -123,7 +126,7 @@ import Testing
         )
         return Rig(
             coordinator: coordinator, time: time, clock: clock, running: running,
-            built: built, cache: cache, overrides: overrides, directory: directory
+            built: built, cache: cache, baseCache: baseCache, overrides: overrides, directory: directory
         )
     }
 
@@ -424,6 +427,31 @@ import Testing
         #expect(on.resolveCalls.isEmpty)
         #expect(off.resolveCalls == ["歌"])
         #expect(rig.coordinator.content().lines.first?.text == "關")
+    }
+
+    @Test @MainActor func cachedResultsAreScopedByTheNetEaseSetting() async throws {
+        let on = FakeResolver(outcomes: ["歌": Self.found("開")])
+        let off = FakeResolver(outcomes: ["歌": Self.found("關")])
+        let rig = Self.rig(on: on, off: off)
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        #expect(rig.coordinator.content().lines.first?.text == "開")
+
+        // Turning NetEase off at once looks the song up again and must not read the "on" cache.
+        rig.coordinator.apply(settings: .defaults.with(\.useNetEase, false))
+        await rig.coordinator.waitForLookup()
+        #expect(off.resolveCalls == ["歌"])
+        #expect(rig.coordinator.content().lines.first?.text == "關")
+
+        let query = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, now: rig.time.value))
+        #expect(rig.baseCache.scoped("netease-on").load(query)?.lyrics?.lines.first?.text == "開")
+        #expect(rig.baseCache.scoped("netease-off").load(query)?.lyrics?.lines.first?.text == "關")
+
+        // Back on: the "on" scope answers from its cache without another lookup.
+        rig.coordinator.apply(settings: .defaults.with(\.useNetEase, true))
+        await rig.coordinator.waitForLookup()
+        #expect(on.resolveCalls == ["歌"])
+        #expect(rig.coordinator.content().lines.first?.text == "開")
     }
 
     @Test @MainActor func unchangedNetEaseSettingKeepsResolver() {
