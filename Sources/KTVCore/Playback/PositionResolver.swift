@@ -3,6 +3,12 @@ public struct PlayerSample: Equatable, Sendable {
     public let position: Double
     public let isPlaying: Bool
     public let at: Double
+
+    public init(position: Double, isPlaying: Bool, at: Double) {
+        self.position = position
+        self.isPlaying = isPlaying
+        self.at = at
+    }
 }
 
 /// Keeps one clock reading and replaces it only when a sample disagrees with its prediction.
