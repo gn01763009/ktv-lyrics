@@ -144,28 +144,61 @@ import Testing
     @Test func placesOnSavedDisplay() {
         let settings = OverlaySettings.defaults.with(\.displayID, "B")
         let placed = PanelPlacement.frame(settings: settings, contentSize: contentSize, screens: [main, external])
-        #expect(external.visibleFrame.contains(placed))
-        #expect(!main.visibleFrame.intersects(placed))
+        #expect(external.visibleFrame.contains(textBlock(of: placed, settings: settings)))
+        #expect(!main.visibleFrame.intersects(textBlock(of: placed, settings: settings)))
     }
 
     @Test func missingDisplayFallsBackToFirst() {
         let settings = OverlaySettings.defaults.with(\.displayID, "gone")
         let placed = PanelPlacement.frame(settings: settings, contentSize: contentSize, screens: [main, external])
-        #expect(main.visibleFrame.contains(placed))
+        #expect(main.visibleFrame.contains(textBlock(of: placed, settings: settings)))
     }
 
-    @Test func clampsToVisibleArea() {
+    /// The visible text block inside a placed panel: centred on the panel, standing on its bottom edge.
+    private func textBlock(of panel: CGRect, settings: OverlaySettings) -> CGRect {
+        let size = PanelPlacement.textBlockSize(settings: settings, contentWidth: panel.width)
+        return CGRect(x: panel.midX - size.width / 2, y: panel.minY, width: size.width, height: size.height)
+    }
+
+    @Test func clampsTheTextBlockToTheVisibleArea() {
         let settings = OverlaySettings.defaults.with(\.anchor, NormalizedPoint(x: 1, y: 1))
         let placed = PanelPlacement.frame(settings: settings, contentSize: contentSize, screens: [main])
-        #expect(main.visibleFrame.contains(placed))
+        #expect(main.visibleFrame.contains(textBlock(of: placed, settings: settings)))
         #expect(placed.size == contentSize)
     }
 
-    @Test func oversizedContentAlignsToVisibleOrigin() {
-        let huge = CGSize(width: 2000, height: 1000)
-        let placed = PanelPlacement.frame(settings: .defaults, contentSize: huge, screens: [main])
-        #expect(placed.origin == CGPoint(x: main.visibleFrame.minX, y: main.visibleFrame.minY))
-        #expect(placed.size == huge)
+    @Test func cornerAnchorsPutTheTextBlockOnTheEdges() {
+        let topRight = OverlaySettings.defaults.with(\.anchor, NormalizedPoint(x: 1, y: 1))
+        let topRightBlock = textBlock(
+            of: PanelPlacement.frame(settings: topRight, contentSize: contentSize, screens: [main]), settings: topRight
+        )
+        #expect(abs(topRightBlock.maxX - main.visibleFrame.maxX) < 0.001)
+        #expect(abs(topRightBlock.maxY - main.visibleFrame.maxY) < 0.001)
+
+        let bottomLeft = OverlaySettings.defaults.with(\.anchor, NormalizedPoint(x: 0, y: 0))
+        let bottomLeftBlock = textBlock(
+            of: PanelPlacement.frame(settings: bottomLeft, contentSize: contentSize, screens: [main]), settings: bottomLeft
+        )
+        #expect(abs(bottomLeftBlock.minX - main.visibleFrame.minX) < 0.001)
+        #expect(abs(bottomLeftBlock.minY - main.visibleFrame.minY) < 0.001)
+    }
+
+    @Test func textBlockUsesTheScaledFontSizeAndNeverExceedsThePanel() {
+        let settings = OverlaySettings.defaults.with(\.size, 40)
+        let scale = settings.style.scale
+        let block = PanelPlacement.textBlockSize(settings: settings, contentWidth: 10_000)
+        #expect(abs(block.width - 40 * scale * 12.5) < 0.001)
+        #expect(abs(block.height - 40 * scale * 3) < 0.001)
+        #expect(PanelPlacement.textBlockSize(settings: settings, contentWidth: 300).width == 300)
+    }
+
+    @Test func panelMayHangPastTheEdgeButTheBlockStaysInside() {
+        let wide = CGSize(width: 2000, height: 1000)
+        let settings = OverlaySettings.defaults.with(\.anchor, NormalizedPoint(x: 0, y: 1))
+        let placed = PanelPlacement.frame(settings: settings, contentSize: wide, screens: [main])
+        #expect(placed.size == wide)
+        #expect(!main.visibleFrame.contains(placed))
+        #expect(main.visibleFrame.contains(textBlock(of: placed, settings: settings)))
     }
 
     @Test func noScreensReturnsOriginRect() {

@@ -55,6 +55,13 @@ import Testing
         #expect(p.frame == startFrame)
     }
 
+    @Test @MainActor func panelIsAllowedToHangPastTheScreenEdge() {
+        let p = makePanel()
+        let offscreen = CGRect(x: -400, y: 5_000, width: 1200, height: 320)
+        #expect(p.constrainFrameRect(offscreen, to: nil) == offscreen)
+        #expect(p.constrainFrameRect(offscreen, to: NSScreen.screens.first) == offscreen)
+    }
+
     @Test func defaultHotKeyIsControlOptionK() {
         #expect(HotKeyCenter.defaultKeyCode == UInt32(kVK_ANSI_K))
         #expect(HotKeyCenter.defaultModifiers == UInt32(controlKey | optionKey))

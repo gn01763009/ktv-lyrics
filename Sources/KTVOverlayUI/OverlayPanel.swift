@@ -42,6 +42,12 @@ public final class OverlayPanel: NSPanel {
     public override var canBecomeKey: Bool { false }
     public override var canBecomeMain: Bool { false }
 
+    /// The panel is mostly transparent, and the controller keeps the visible text inside the screen.
+    /// So macOS must not pull the panel back when it hangs past an edge.
+    public override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+
     /// Moves the panel by `delta` points (screen coordinates). Does nothing outside move mode.
     func dragBy(_ delta: CGSize) {
         guard isMoveMode else { return }
