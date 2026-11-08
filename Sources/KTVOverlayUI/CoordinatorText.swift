@@ -7,6 +7,13 @@ enum CoordinatorText {
     /// Seconds the "not found" notice stays up after a lookup finds nothing.
     static let notFoundNoticeSeconds: Double = 6
 
+    /// Seconds a message about an import or save stays on screen.
+    static let userNoticeSeconds: Double = 6
+
+    static let importNeedsSong = "♪ 請先播放歌曲，再匯入 .lrc"
+    static let importUnusable = "♪ 匯入失敗：檔案裡沒有帶時間的歌詞，已維持原本的字幕"
+    static let saveFailed = "♪ 無法儲存這首歌的設定"
+
     static let waiting = "等待播放…"
     static let adapterRestarting = "抓歌工具重新啟動中…"
     static let adapterFailed = "偵測不到播放器"

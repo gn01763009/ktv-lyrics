@@ -28,7 +28,12 @@ final class AppController: NSObject, NSApplicationDelegate {
     private static let perl = "/usr/bin/perl"
 
     private let settingsStore = UserDefaultsSettingsStore()
-    private var settings: OverlaySettings
+    private lazy var settingsModel = SettingsViewModel(
+        store: settingsStore,
+        onChange: { [weak self] in self?.settingsChanged($0) }
+    )
+    private lazy var settingsWindow = SettingsWindowController(model: settingsModel)
+    private var settings: OverlaySettings { settingsModel.settings }
     private let coordinator: AppCoordinator
     private let paths = AppPaths.current()
     private let view = OverlayView(frame: .zero)
@@ -42,7 +47,6 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     override init() {
         let settings = settingsStore.load()
-        self.settings = settings
         coordinator = AppCoordinator(
             makeResolver: Self.makeResolver,
             cache: LyricsCache(directory: paths.cacheDirectory),
@@ -99,7 +103,12 @@ final class AppController: NSObject, NSApplicationDelegate {
                 showLater: { [coordinator] in coordinator.adjustOffset(by: -Self.offsetStep) },
                 toggleMoveMode: { [weak self] in self?.toggleMoveMode() },
                 toggleVisibility: { [weak self] in self?.toggleVisibility() },
-                quit: { NSApp.terminate(nil) }
+                quit: { NSApp.terminate(nil) },
+                candidates: { [coordinator] in await coordinator.availableCandidates() },
+                selectedCandidateID: { [coordinator] in coordinator.selectedCandidateID },
+                selectCandidate: { [coordinator] in coordinator.selectCandidate(id: $0) },
+                importLRC: { [coordinator] in LRCImportPicker(coordinator: coordinator).run() },
+                openSettings: { [weak self] in self?.settingsWindow.show() }
             ),
             offsetStep: Self.offsetStep
         )
@@ -185,11 +194,16 @@ final class AppController: NSObject, NSApplicationDelegate {
             Self.logger.error("The panel was moved but no screen is connected; position not saved")
             return
         }
-        settings = settings
-            .with(\.anchor, PanelPlacement.anchor(for: frame, on: screen))
-            .with(\.displayID, screen.id)
-        settingsStore.save(settings)
+        settingsModel.update {
+            $0.with(\.anchor, PanelPlacement.anchor(for: frame, on: screen)).with(\.displayID, screen.id)
+        }
+    }
+
+    /// Every settings change, from the window or from dragging the panel, lands here.
+    private func settingsChanged(_ settings: OverlaySettings) {
         coordinator.apply(settings: settings)
+        view.settings = settings
+        panel?.setFrame(panelFrame(), display: true)
     }
 
     private func overlapArea(_ screen: CGRect, _ frame: CGRect) -> CGFloat {
