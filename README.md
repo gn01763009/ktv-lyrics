@@ -21,9 +21,9 @@ git clone <repo> && cd ktv-lyrics && make install
 
 `<repo>` 是公開後的 repository 位址，目前尚未公開，公開後會替換。
 
-`make install` 會先編譯 app，然後刪除舊的 `/Applications/KTV Lyrics.app`（如果有），再用 `ditto` 複製新的 app 過去。只想編譯、不安裝，執行 `make app`，產物在 `build/KTV Lyrics.app`。
+`make install` 會先編譯 app，然後刪除舊的 `/Applications/KTV Lyrics.app`（如果有），再用 `ditto` 複製新的 app 過去。**執行 `make install` 前請先結束 KTV Lyrics**（選單列 ♪ → 結束），避免替換正在執行的 app。只想編譯、不安裝，執行 `make app`，產物在 `build/KTV Lyrics.app`。
 
-第一次播放歌曲時，macOS 會詢問是否允許 KTV Lyrics 控制 Spotify 或音樂 app。這是用來讀取播放位置，讓字幕跟上歌曲。
+第一次播放歌曲時，macOS 可能會詢問是否允許 KTV Lyrics 控制 Spotify 或音樂 app（實際是否出現，以你的 Mac 為準）。這是用來讀取播放位置，讓字幕跟上歌曲。
 
 ### 下載未公證的 app（尚未測試）
 
@@ -51,7 +51,20 @@ git clone <repo> && cd ktv-lyrics && make install
 
 如果不想使用網易雲，到 **設定 → 歌詞來源**，關閉「使用網易雲音樂」即可，之後只使用 LRCLIB。
 
-找不到歌詞時，字幕層會短暫顯示「找不到字幕」，然後保持透明。這時可以用選單列的「匯入 .lrc…」匯入自己的歌詞檔，或用「換版本」切換候選版本。
+### 隱私：會送出什麼
+
+為了查歌詞，**歌名與歌手名稱預設會送到 LRCLIB 與網易雲音樂**。這包含瀏覽器正在播放的媒體標題（例如 YouTube 影片的標題），因為 app 無法分辨它是不是歌曲。除此之外不會送出其他資料。關閉「使用網易雲音樂」後，只會送到 LRCLIB。
+
+### 快取
+
+查到的歌詞與每首歌的設定（偏移、匯入的 .lrc、選的版本）存在 `~/Library/Application Support/KTV Lyrics/`：
+
+- `cache/`：歌詞快取。依「是否使用網易雲音樂」分成 `netease-on` 與 `netease-off` 兩個子資料夾，切換設定會立刻讀寫對應的那一個。找不到的結果只保留 24 小時；因為網路或來源失敗而沒查完的結果不會存。
+- `overrides/`：每首歌的偏移、匯入的歌詞與選的版本。
+
+要清除快取，先結束 app，再刪掉資料夾：`rm -rf ~/Library/Application\ Support/KTV\ Lyrics/cache`。要連每首歌的設定一起清掉，刪除整個 `KTV Lyrics` 資料夾。
+
+找不到歌詞時，字幕層會短暫顯示「找不到字幕」，然後保持透明。如果是因為網路或來源暫時失敗，會顯示「暫時查不到字幕，下次播放會再試一次」，且不會被當成找不到而記住。這時可以用選單列的「匯入 .lrc…」匯入自己的歌詞檔，或用「換版本」切換候選版本。
 
 ## 測試狀況
 
