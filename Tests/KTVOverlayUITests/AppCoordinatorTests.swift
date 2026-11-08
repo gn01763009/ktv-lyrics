@@ -527,10 +527,34 @@ import Testing
     @Test @MainActor func pausePositionIsFrozen() async {
         let rig = Self.rig(on: FakeResolver(outcomes: ["歌": Self.found()]))
         defer { rig.cleanUp() }
+        await rig.playAndWait("歌", elapsed: 19.6)
         rig.coordinator.handle(.playing(Self.snapshot("歌", elapsed: 19.6, playing: false, now: rig.time.value)))
-        await rig.coordinator.waitForLookup()
         rig.time.value += 30
         #expect(Self.isCountdown(rig.coordinator.content().scene))
+    }
+
+    @Test @MainActor func longPauseBlanksTheOverlayAndResumingBringsItBack() async {
+        let rig = Self.rig(on: FakeResolver(outcomes: ["歌": Self.found()]))
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌", elapsed: 19.6)
+        rig.coordinator.handle(.playing(Self.snapshot("歌", elapsed: 19.6, playing: false, now: rig.time.value)))
+        rig.time.value += 59
+        #expect(Self.isCountdown(rig.coordinator.content().scene))
+        rig.time.value += 2
+        #expect(rig.coordinator.content().scene == .idle)
+        #expect(rig.coordinator.content().isQuiet)
+        rig.coordinator.handle(.playing(Self.snapshot("歌", elapsed: 19.6, playing: true, now: rig.time.value)))
+        #expect(rig.coordinator.content().scene != .idle)
+    }
+
+    @Test @MainActor func songAlreadyPausedWhenFirstSeenShowsNothingUntilItPlays() async {
+        let rig = Self.rig(on: FakeResolver(outcomes: ["歌": Self.found()]))
+        defer { rig.cleanUp() }
+        rig.coordinator.handle(.playing(Self.snapshot("歌", elapsed: 19.6, playing: false, now: rig.time.value)))
+        await rig.coordinator.waitForLookup()
+        #expect(rig.coordinator.content().scene == .idle)
+        rig.coordinator.handle(.playing(Self.snapshot("歌", elapsed: 19.6, playing: true, now: rig.time.value)))
+        #expect(rig.coordinator.content().scene != .idle)
     }
 
     // MARK: - Helpers

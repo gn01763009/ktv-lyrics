@@ -7,6 +7,9 @@ enum CoordinatorText {
     /// Seconds the "not found" notice stays up after a lookup finds nothing.
     static let notFoundNoticeSeconds: Double = 6
 
+    /// After this many seconds paused, the overlay goes blank until playback resumes.
+    static let pausedHideSeconds: Double = 60
+
     /// Seconds to wait for a track's duration before looking it up without one.
     static let durationGraceSeconds: Double = 1.5
     /// A duration that moves by more than this many seconds for the same track starts a new lookup.

@@ -56,6 +56,9 @@ public final class AppCoordinator {
     private var userNotice: TimedNotice?
     /// When a track arrived without a duration, the time after which it is looked up anyway, without caching.
     private var lookupDeadline: Double?
+    /// When playback paused, or `alreadyPaused` for a song that was paused when first seen. Nil while playing.
+    private var pausedSince: Double?
+    private static let alreadyPaused = -Double.infinity
 
     public init(
         makeResolver: @escaping (_ useNetEase: Bool) -> any LyricsResolving,
@@ -91,6 +94,7 @@ public final class AppCoordinator {
             let previous = snapshot
             let isNewTrack = merged.trackKey != previous?.trackKey
             snapshot = merged
+            updatePauseState(merged, previous: previous, isNewTrack: isNewTrack)
             if isNewTrack {
                 startTrack(merged)
             } else if let previous, abs(merged.duration - previous.duration) > CoordinatorText.durationChangeSeconds {
@@ -110,6 +114,23 @@ public final class AppCoordinator {
               let player = ScriptablePlayer.toPoll(bundleID: snapshot.bundleID, running: runningApps()),
               let sample = clock.read(player) else { return }
         positionResolver = positionResolver.applying(sample, snapshot: snapshot)
+    }
+
+    /// Tracks how long playback has been paused. A song first seen paused counts as paused for good,
+    /// so nothing shows until it plays.
+    private func updatePauseState(_ merged: PlaybackSnapshot, previous: PlaybackSnapshot?, isNewTrack: Bool) {
+        if merged.isPlaying {
+            pausedSince = nil
+        } else if isNewTrack {
+            pausedSince = Self.alreadyPaused
+        } else if previous?.isPlaying == true {
+            pausedSince = now()
+        }
+    }
+
+    private var pausedTooLong: Bool {
+        guard let pausedSince else { return false }
+        return now() - pausedSince >= CoordinatorText.pausedHideSeconds
     }
 
     /// Starts a lookup that was held back for a missing duration once its grace period is over.
@@ -234,7 +255,8 @@ public final class AppCoordinator {
     }
 
     private func scene(for snapshot: PlaybackSnapshot, track: CurrentTrack) -> KaraokeScene {
-        guard let loaded, let position = positionResolver.position(snapshot: snapshot, now: now()) else { return .idle }
+        guard !pausedTooLong, let loaded,
+              let position = positionResolver.position(snapshot: snapshot, now: now()) else { return .idle }
         let lead = loaded.lyrics.isWordTimed ? 0 : LyricsTiming.subtitleLead
         let shown = position + track.songOverride.offset + lead
         return CoordinatorText.filtered(loaded.engine.scene(at: shown), by: settings)
@@ -356,6 +378,7 @@ public final class AppCoordinator {
         offered = []
         lookup = .idle
         lookupDeadline = nil
+        pausedSince = nil
         positionResolver = PositionResolver()
     }
 }
