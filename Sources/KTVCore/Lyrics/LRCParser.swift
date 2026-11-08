@@ -1,8 +1,12 @@
 import Foundation
+import os
 
 /// Parses LRC text into timed stamps and credit lines.
-/// Parsing is pure and tolerant: malformed rows are skipped, never fatal.
+/// Parsing is pure and tolerant: malformed rows are skipped, never fatal, and each skipped timestamp is logged at debug level.
 public enum LRCParser {
+    private static let logger = Logger(subsystem: "KTVLyrics", category: "LRCParser")
+    /// How much of a skipped row is written to the log.
+    private static let loggedPrefixLength = 40
     private static let secondsPerMinute: Double = 60
     /// Only the first rows of a file can hold credits or a song header.
     private static let headerRowLimit = 14
@@ -42,9 +46,17 @@ public enum LRCParser {
         guard let last = tags.last else { return [] }
         let text = String(line[last.range.upperBound...]).trimmingCharacters(in: .whitespaces)
         return tags.compactMap { tag -> LRCStamp? in
-            guard let time = timeInSeconds(minutes: tag.output.1, seconds: tag.output.2) else { return nil }
+            guard let time = timeInSeconds(minutes: tag.output.1, seconds: tag.output.2) else {
+                logSkipped(line, reason: "invalid timestamp")
+                return nil
+            }
             return LRCStamp(time: time, text: text)
         }
+    }
+
+    private static func logSkipped(_ row: Substring, reason: String) {
+        let prefix = String(row.prefix(loggedPrefixLength))
+        logger.debug("Skipped LRC row (\(reason, privacy: .public)): \(prefix, privacy: .public)")
     }
 
     private static func timeInSeconds(minutes: Substring, seconds: Substring) -> Double? {
