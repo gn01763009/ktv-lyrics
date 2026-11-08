@@ -37,7 +37,16 @@ public final class PlayerClockReader: PlayerClockReading {
             Self.logger.error("Unexpected clock reply from \(player.rawValue, privacy: .public)")
             return nil
         }
-        return PlayerSample(position: position, isPlaying: state == Self.playingState, at: (before + after) / 2)
+        return Self.sample(position: position, state: state, at: (before + after) / 2)
+    }
+
+    /// The sample for a reply, or nil, with a log, when the position is not a finite, non-negative time.
+    static func sample(position: Double, state: String, at: Double) -> PlayerSample? {
+        guard position.isFinite, position >= 0 else {
+            logger.error("Rejected clock position \(position, privacy: .public)")
+            return nil
+        }
+        return PlayerSample(position: position, isPlaying: state == playingState, at: at)
     }
 
     private func script(for player: ScriptablePlayer) -> NSAppleScript? {
