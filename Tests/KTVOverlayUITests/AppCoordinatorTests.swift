@@ -83,8 +83,10 @@ import Testing
         let overrides: SongOverrideStore
         let directory: URL
 
-        func play(_ title: String, elapsed: Double = 2, artist: String = "歌手") {
-            coordinator.handle(.playing(AppCoordinatorTests.snapshot(title, elapsed: elapsed, artist: artist, now: time.value)))
+        func play(_ title: String, elapsed: Double = 2, artist: String = "歌手", duration: Double = 200) {
+            coordinator.handle(.playing(AppCoordinatorTests.snapshot(
+                title, elapsed: elapsed, artist: artist, duration: duration, now: time.value
+            )))
         }
 
         func playAndWait(_ title: String, elapsed: Double = 2) async {
@@ -130,10 +132,11 @@ import Testing
         elapsed: Double,
         artist: String = "歌手",
         playing: Bool = true,
+        duration: Double = 200,
         now: Double
     ) -> PlaybackSnapshot {
         PlaybackSnapshot(
-            title: title, artist: artist, duration: 200, elapsed: elapsed, timestamp: now,
+            title: title, artist: artist, duration: duration, elapsed: elapsed, timestamp: now,
             rate: 1, isPlaying: playing, bundleID: spotify
         )
     }
@@ -291,6 +294,53 @@ import Testing
         #expect(rig.coordinator.content().lines.first?.text == "部分")
         let query = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, now: rig.time.value))
         #expect(rig.cache.load(query) == nil)
+    }
+
+    @Test @MainActor func unknownDurationHoldsTheLookupThenSearchesWithoutCaching() async {
+        let resolver = FakeResolver(outcomes: ["歌": Self.found("暫時")])
+        let rig = Self.rig(on: resolver)
+        defer { rig.cleanUp() }
+        rig.play("歌", duration: 0)
+        rig.time.value += 1.0
+        rig.coordinator.advance()
+        #expect(resolver.resolveCalls.isEmpty)
+        rig.time.value += 0.6
+        rig.coordinator.advance()
+        await rig.coordinator.waitForLookup()
+        #expect(resolver.resolveCalls == ["歌"])
+        #expect(rig.coordinator.content().lines.first?.text == "暫時")
+        let unknown = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, duration: 0, now: rig.time.value))
+        #expect(rig.cache.load(unknown) == nil)
+    }
+
+    @Test @MainActor func durationArrivingInTheGraceWindowStartsTheRealLookup() async {
+        let resolver = FakeResolver(outcomes: ["歌": Self.found("完整")])
+        let rig = Self.rig(on: resolver)
+        defer { rig.cleanUp() }
+        rig.play("歌", duration: 0)
+        rig.time.value += 0.5
+        rig.play("歌", duration: 200)
+        await rig.coordinator.waitForLookup()
+        #expect(resolver.resolveCalls == ["歌"])
+        let query = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, duration: 200, now: rig.time.value))
+        #expect(rig.cache.load(query)?.lyrics?.lines.first?.text == "完整")
+        rig.time.value += 5
+        rig.coordinator.advance()
+        await rig.coordinator.waitForLookup()
+        #expect(resolver.resolveCalls == ["歌"])
+    }
+
+    @Test @MainActor func aLaterDurationChangeOverOneSecondLooksUpAgain() async {
+        let resolver = FakeResolver(outcomes: ["歌": Self.found()])
+        let rig = Self.rig(on: resolver)
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        rig.play("歌", duration: 200.8)
+        await rig.coordinator.waitForLookup()
+        #expect(resolver.resolveCalls.count == 1)
+        rig.play("歌", duration: 215)
+        await rig.coordinator.waitForLookup()
+        #expect(resolver.resolveCalls.count == 2)
     }
 
     @Test @MainActor func lookupNoticeExpiresAfterEightSeconds() async {

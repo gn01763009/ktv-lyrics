@@ -53,6 +53,8 @@ public final class AppCoordinator {
     private var adapterStatus = AdapterStatus.running
     private var offered: [LyricsCandidate] = []
     private var userNotice: TimedNotice?
+    /// When a track arrived without a duration, the time after which it is looked up anyway, without caching.
+    private var lookupDeadline: Double?
 
     public init(
         makeResolver: @escaping (_ useNetEase: Bool) -> any LyricsResolving,
@@ -79,9 +81,14 @@ public final class AppCoordinator {
         switch event {
         case .playing(let incoming):
             let merged = incoming.merging(previous: snapshot)
-            let isNewTrack = merged.trackKey != snapshot?.trackKey
+            let previous = snapshot
+            let isNewTrack = merged.trackKey != previous?.trackKey
             snapshot = merged
-            if isNewTrack { startTrack(merged) }
+            if isNewTrack {
+                startTrack(merged)
+            } else if let previous, abs(merged.duration - previous.duration) > CoordinatorText.durationChangeSeconds {
+                restartLookup(merged)
+            }
             pollClock()
         case .nothing:
             clearTrack()
@@ -96,6 +103,14 @@ public final class AppCoordinator {
               let player = ScriptablePlayer.toPoll(bundleID: snapshot.bundleID, running: runningApps()),
               let sample = clock.read(player) else { return }
         positionResolver = positionResolver.applying(sample, snapshot: snapshot)
+    }
+
+    /// Starts a lookup that was held back for a missing duration once its grace period is over.
+    /// The result is not cached, because the query has no duration. Call this regularly.
+    public func advance() {
+        guard let deadline = lookupDeadline, now() >= deadline, let track else { return }
+        lookupDeadline = nil
+        beginLookup(query: track.query, songOverride: track.songOverride, id: gate.currentID, cacheable: false)
     }
 
     public func setAdapterStatus(_ status: AdapterStatus) {
@@ -249,16 +264,37 @@ public final class AppCoordinator {
         userNotice = nil
         positionResolver = PositionResolver()
         lookup = .searching(since: now())
-        beginLookup(query: query, songOverride: songOverride, id: gate.currentID)
+        lookupDeadline = nil
+        if snapshot.duration > 0 {
+            beginLookup(query: query, songOverride: songOverride, id: gate.currentID, cacheable: true)
+        } else {
+            lookupDeadline = now() + CoordinatorText.durationGraceSeconds
+        }
+    }
+
+    /// The same song reported a different duration: look it up again with the final one, and reload what
+    /// the user stored for that query. Lyrics already on screen stay until the new answer arrives.
+    private func restartLookup(_ snapshot: PlaybackSnapshot) {
+        guard let track else { return }
+        let query = TitleNormalizer.query(from: snapshot)
+        let songOverride = overrides.load(query)
+        gate = gate.next()
+        self.track = CurrentTrack(
+            query: query, trackKey: track.trackKey, usesRedTitle: track.usesRedTitle, songOverride: songOverride
+        )
+        offered = []
+        lookupDeadline = nil
+        if loaded == nil { lookup = .searching(since: now()) }
+        beginLookup(query: query, songOverride: songOverride, id: gate.currentID, cacheable: true)
     }
 
     /// The task is never cancelled: a cancelled network call would be cached as "not found".
     /// A superseded lookup finishes quietly and `finishLookup` drops its result.
-    private func beginLookup(query: TrackQuery, songOverride: SongOverride, id: Int) {
+    private func beginLookup(query: TrackQuery, songOverride: SongOverride, id: Int, cacheable: Bool) {
         let locator = self.locator
         let resolver = self.resolver
         lookupTask = Task { [weak self] in
-            let outcome = await locator.locate(query, override: songOverride, resolver: resolver)
+            let outcome = await locator.locate(query, override: songOverride, resolver: resolver, usesCache: cacheable)
             self?.finishLookup(outcome, id: id)
         }
     }
@@ -305,6 +341,7 @@ public final class AppCoordinator {
         loaded = nil
         offered = []
         lookup = .idle
+        lookupDeadline = nil
         positionResolver = PositionResolver()
     }
 }

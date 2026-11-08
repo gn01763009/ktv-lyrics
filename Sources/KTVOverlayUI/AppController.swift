@@ -170,6 +170,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     /// and it does not ask the player for its clock.
     private func tick() {
         guard let link = displayLink else { return }
+        coordinator.advance()
         guard link.isPaused else {
             coordinator.pollClock()
             return

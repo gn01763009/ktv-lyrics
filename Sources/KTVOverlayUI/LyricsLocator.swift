@@ -9,14 +9,21 @@ struct LyricsLocator: Sendable {
 
     let cache: LyricsCache
 
-    func locate(_ query: TrackQuery, override: SongOverride, resolver: any LyricsResolving) async -> LyricsOutcome {
+    /// With `usesCache` false the cache is neither read nor written. Used when the query is not trustworthy,
+    /// for example a track whose duration is still unknown.
+    func locate(
+        _ query: TrackQuery,
+        override: SongOverride,
+        resolver: any LyricsResolving,
+        usesCache: Bool = true
+    ) async -> LyricsOutcome {
         if let imported = importedLyrics(override) { return .found(imported) }
         if let chosen = await chosenCandidate(query, override: override, resolver: resolver) {
             return .found(chosen)
         }
-        if let cached = cache.load(query) { return cached }
+        if usesCache, let cached = cache.load(query) { return cached }
         let outcome = await resolver.resolve(query)
-        save(outcome, for: query)
+        if usesCache { save(outcome, for: query) }
         return outcome
     }
 

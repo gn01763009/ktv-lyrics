@@ -66,6 +66,18 @@ import Testing
         #expect(merged.position(now: 1002) == 102)
     }
 
+    @Test func missingDurationKeepsThePreviousOne() {
+        let previous = snapshot(elapsed: 100, timestamp: 1000)
+        let noDuration = PlaybackSnapshot(
+            title: previous.title, artist: previous.artist, duration: 0, elapsed: 105, timestamp: 1005,
+            rate: 1, isPlaying: true, bundleID: previous.bundleID
+        )
+        let merged = noDuration.merging(previous: previous)
+        #expect(merged.duration == previous.duration)
+        #expect(merged.elapsed == 105)
+        #expect(snapshot(title: "別首歌", elapsed: 1, timestamp: 1).merging(previous: previous).duration == snapshot(title: "別首歌", elapsed: 1, timestamp: 1).duration)
+    }
+
     @Test func differentTrackDoesNotMerge() {
         let previous = snapshot(title: "別首歌", elapsed: 100, timestamp: 1000)
         let glitch = snapshot(elapsed: nil, timestamp: nil)

@@ -41,18 +41,19 @@ public struct PlaybackSnapshot: Equatable, Sendable {
         return elapsed + (now - timestamp) * rate
     }
 
-    /// Fills in a missing reference point from the previous reading of the same song.
-    /// Players drop elapsed time for a moment on pause, so the last known point is kept.
+    /// Fills in what this reading lacks from the previous reading of the same song: a missing reference point
+    /// (players drop elapsed time for a moment on pause) and a missing duration (some rows omit it).
     public func merging(previous: PlaybackSnapshot?) -> PlaybackSnapshot {
-        guard let previous, elapsed == nil || timestamp == nil, previous.trackKey == trackKey else {
-            return self
-        }
+        guard let previous, previous.trackKey == trackKey else { return self }
+        let lacksClock = elapsed == nil || timestamp == nil
+        let lacksDuration = duration <= 0 && previous.duration > 0
+        guard lacksClock || lacksDuration else { return self }
         return PlaybackSnapshot(
             title: title,
             artist: artist,
-            duration: duration,
-            elapsed: previous.elapsed,
-            timestamp: previous.timestamp,
+            duration: lacksDuration ? previous.duration : duration,
+            elapsed: lacksClock ? previous.elapsed : elapsed,
+            timestamp: lacksClock ? previous.timestamp : timestamp,
             rate: rate,
             isPlaying: isPlaying,
             bundleID: bundleID
