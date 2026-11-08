@@ -27,6 +27,15 @@ import Testing
         #expect(LRCParser.parse("[00:10.00]男：第一句").stamps.first?.text == "男：第一句")
     }
 
+    @Test func keepsGenderedLabelLinesAsBody() {
+        #expect(LRCParser.parse("[00:10.00]男生：我愛你").stamps == [LRCStamp(time: 10, text: "男生：我愛你")])
+        #expect(LRCParser.parse("[00:10.00]女生：我愛你").stamps == [LRCStamp(time: 10, text: "女生：我愛你")])
+    }
+
+    @Test func keepsChorusLabelLineAsBody() {
+        #expect(LRCParser.parse("[00:12.00]合唱：一起唱").stamps == [LRCStamp(time: 12, text: "合唱：一起唱")])
+    }
+
     @Test func skipsMalformedRows() {
         #expect(LRCParser.parse("[aa:bb]x\n[99:99.99]y\n沒有時間\n{\"t\":0}\n[00:05.00]好").stamps == [
             LRCStamp(time: 5, text: "好"),

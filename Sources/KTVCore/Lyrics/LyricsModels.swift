@@ -44,6 +44,12 @@ public struct Lyrics: Equatable, Codable, Sendable {
     public let lines: [LyricLine]
     public let credits: [String]
 
+    public init(source: LyricsSource, lines: [LyricLine], credits: [String]) {
+        self.source = source
+        self.lines = lines
+        self.credits = credits
+    }
+
     public var isWordTimed: Bool {
         lines.contains { $0.words != nil }
     }
@@ -52,9 +58,19 @@ public struct Lyrics: Equatable, Codable, Sendable {
 public struct LRCStamp: Equatable, Sendable {
     public let time: Double
     public let text: String
+
+    public init(time: Double, text: String) {
+        self.time = time
+        self.text = text
+    }
 }
 
 public struct ParsedLRC: Equatable, Sendable {
     public let stamps: [LRCStamp]
     public let credits: [String]
+
+    public init(stamps: [LRCStamp], credits: [String]) {
+        self.stamps = stamps
+        self.credits = credits
+    }
 }

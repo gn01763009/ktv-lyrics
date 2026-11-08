@@ -9,7 +9,8 @@ public enum LRCParser {
 
     private static let tagPattern = #/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/#
     private static let headerPattern = #/^[^:：]{1,10}\s*[:：]/#
-    private static let partPattern = #/^[(（]?(男|女|合)[)）]?\s*[:：]\s*/#
+    /// Any line starting with 男, 女 or 合 (optionally in parentheses) is lyrics, not a header.
+    private static let partPattern = #/^[(（]?[男女合]/#
     private static let creditPattern = #/^(作词|作詞|作曲)\s*[:：]\s*(.+)$/#
 
     private enum HeaderRole: Equatable {
