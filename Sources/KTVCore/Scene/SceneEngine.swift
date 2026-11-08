@@ -44,6 +44,8 @@ public struct SceneEngine: Sendable {
         }
         let next = lines[index + 1]
         guard next.start - line.holdEnd >= LyricsTiming.interludeMinGap else { return .held(index: index) }
+        // The line stays up for its full hold, then the interlude begins.
+        if position < line.holdEnd { return .held(index: index) }
         if position >= next.start - LyricsTiming.countdownSeconds {
             return countdown(upcoming: index + 1, startsAt: next.start, at: position)
         }

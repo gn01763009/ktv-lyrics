@@ -31,6 +31,18 @@ import Testing
         #expect(engine.scene(at: 39) == .countdown(upcoming: 2, stars: 4))
     }
 
+    @Test func lineBeforeAnInterludeStaysHeldUntilItsHoldEnds() {
+        let lines = [
+            LyricLine(start: 20, end: 23, holdEnd: 31, text: "一"),
+            LyricLine(start: 50, end: 53, holdEnd: 53, text: "二"),
+        ]
+        let engine = SceneEngine(lines: lines, bannerAfter: [0])
+        #expect(engine.scene(at: 23.5) == .held(index: 0))
+        #expect(engine.scene(at: 30.9) == .held(index: 0))
+        #expect(engine.scene(at: 31) == .interlude(showBanner: true))
+        #expect(engine.scene(at: 47) == .countdown(upcoming: 1, stars: 4))
+    }
+
     @Test func interludeWithoutBanner() {
         #expect(SceneEngine(lines: song, bannerAfter: []).scene(at: 30) == .interlude(showBanner: false))
     }
