@@ -23,6 +23,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     private static let panelMaxWidth: CGFloat = 1500
     private static let panelHeight: CGFloat = 320
     private static let clockPollSeconds: TimeInterval = 1
+    private static let minFrameRate: Float = 30
+    private static let maxFrameRate: Float = 60
     private static let offsetStep = 0.3
     private static let adapterOptions = ["stream", "--no-diff", "--no-artwork", "--micros", "--debounce=100"]
     private static let perl = "/usr/bin/perl"
@@ -125,7 +127,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         let process = AdapterProcess(
             executable: Self.perl,
             arguments: [script.path, framework.path] + Self.adapterOptions,
-            onEvent: { [weak self] event in MainActor.assumeIsolated { self?.coordinator.handle(event) } },
+            onEvent: { [weak self] event in MainActor.assumeIsolated { self?.handleAdapterEvent(event) } },
             onStatus: { [weak self] status in MainActor.assumeIsolated { self?.coordinator.setAdapterStatus(status) } }
         )
         adapter = process
@@ -134,10 +136,13 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func startTimers() {
         let link = view.displayLink(target: self, selector: #selector(redraw(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(
+            minimum: Self.minFrameRate, maximum: Self.maxFrameRate, preferred: Self.maxFrameRate
+        )
         link.add(to: .main, forMode: .common)
         displayLink = link
         let timer = Timer(timeInterval: Self.clockPollSeconds, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.coordinator.pollClock() }
+            MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         clockTimer = timer
@@ -157,6 +162,25 @@ final class AppController: NSObject, NSApplicationDelegate {
     @objc private func redraw(_ link: CADisplayLink) {
         let next = coordinator.content()
         if next != view.content { view.content = next }
+        // Nothing is moving: sleep until the one-second timer or a system event wakes the link.
+        if next.isQuiet { link.isPaused = true }
+    }
+
+    /// Runs every second. While the link sleeps it only checks whether something now needs drawing,
+    /// and it does not ask the player for its clock.
+    private func tick() {
+        guard let link = displayLink else { return }
+        guard link.isPaused else {
+            coordinator.pollClock()
+            return
+        }
+        if !coordinator.content().isQuiet { link.isPaused = false }
+    }
+
+    /// A system event may change the song, the position or the play state, so the clock is read once and the link wakes.
+    private func handleAdapterEvent(_ event: AdapterEvent) {
+        coordinator.handle(event)
+        displayLink?.isPaused = false
     }
 
     @objc private func screensChanged() {

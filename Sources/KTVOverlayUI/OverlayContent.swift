@@ -28,6 +28,11 @@ public struct OverlayContent: Equatable {
         self.usesRedTitle = usesRedTitle
     }
 
+    /// Whether drawing would change nothing: an idle scene and no notice. The display link may sleep then.
+    public var isQuiet: Bool {
+        scene == .idle && (notice ?? "").isEmpty
+    }
+
     /// Nothing to show: an idle scene with no lines.
     public static let empty = OverlayContent(scene: .idle, lines: [], title: "")
 }

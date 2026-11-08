@@ -13,6 +13,14 @@ import Testing
     private let creditTopPoints = 110.0
     private let canvas = CGSize(width: 1200, height: 320)
 
+    @Test func quietContentIsIdleWithoutANotice() {
+        #expect(OverlayContent.empty.isQuiet)
+        #expect(OverlayContent(scene: .idle, lines: [], title: "歌", notice: "").isQuiet)
+        #expect(!OverlayContent(scene: .idle, lines: [], title: "歌", notice: "♪ 找不到").isQuiet)
+        #expect(!OverlayContent(scene: .title, lines: [], title: "歌").isQuiet)
+        #expect(!OverlayContent(scene: .interlude(showBanner: false), lines: [], title: "歌").isQuiet)
+    }
+
     @Test @MainActor func idleIsFullyTransparent() {
         #expect(render(.idle).maxAlpha == 0)
     }
