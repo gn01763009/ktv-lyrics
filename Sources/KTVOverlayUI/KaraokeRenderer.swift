@@ -15,6 +15,8 @@ struct KaraokeRenderer {
     private static let bannerBottom: CGFloat = 40
     private static let noticeSize: CGFloat = 22
     private static let noticeBottom: CGFloat = 24
+    private static let subtitleBlockEms: CGFloat = 3
+    private static let urgentNoticeGap: CGFloat = 8
     private static let titleScale: CGFloat = 1.4
     private static let creditScale: CGFloat = 0.74
     private static let creditSpacing: CGFloat = 1.02
@@ -45,6 +47,7 @@ struct KaraokeRenderer {
         case .singing(let index, let sweep): drawLine(at: index, sweep: sweep)
         case .held(let index): drawLine(at: index, sweep: .linear(1))
         }
+        if content.noticeIsUrgent, content.scene != .idle { drawUrgentNotice() }
     }
 
     // MARK: Scenes
@@ -82,8 +85,29 @@ struct KaraokeRenderer {
         drawCentered(.unsung(notice), y: Self.noticeBottom, size: Self.noticeSize)
     }
 
+    /// A failure notice sits just above whatever the scene draws, so lyrics never hide it.
+    private func drawUrgentNotice() {
+        guard let notice = content.notice, !notice.isEmpty else { return }
+        let top: CGFloat
+        if content.scene == .title {
+            top = titleTop(creditCount: titleCredits.count)
+        } else {
+            top = Self.bottomMargin + em * Self.subtitleBlockEms
+        }
+        drawCentered(.unsung(notice), y: top + Self.urgentNoticeGap, size: Self.noticeSize)
+    }
+
+    private var titleCredits: [String] {
+        (content.artist.map { [Self.originalArtistLabel + $0] } ?? []) + content.credits
+    }
+
+    /// The top edge of the title text, measured up from the bottom of the canvas.
+    private func titleTop(creditCount: Int) -> CGFloat {
+        Self.creditsBottom + Self.titleGap + CGFloat(creditCount) * em * Self.creditSpacing + em * Self.titleScale
+    }
+
     private func drawTitleCard() {
-        let credits = (content.artist.map { [Self.originalArtistLabel + $0] } ?? []) + content.credits
+        let credits = titleCredits
         let lineHeight = em * Self.creditSpacing
         let boxLeft = (canvas.width - em * Self.minBoxWidth) / 2
         let creditInk = usesClassicTitle && content.usesRedTitle ? Ink.sung(style) : unsungInk

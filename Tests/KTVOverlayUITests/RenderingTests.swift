@@ -83,6 +83,33 @@ import Testing
         #expect(render(.interlude(showBanner: false), notice: "♪ 正在找字幕").maxAlpha == 0)
     }
 
+    @Test @MainActor func urgentNoticeDrawsAboveTheLyrics() {
+        let block = PanelPlacement.textBlockSize(settings: .defaults, contentWidth: canvas.width)
+        let plain = render(.held(index: 0))
+        let urgent = render(.held(index: 0), notice: "♪ 匯入失敗", urgent: true)
+        let lyricsTopRows = Int((16 + block.height) * scale(urgent))
+        #expect(plain.hasInk(aboveRowsFromBottom: lyricsTopRows) == false)
+        #expect(urgent.hasInk(aboveRowsFromBottom: lyricsTopRows))
+    }
+
+    @Test @MainActor func urgentNoticeDrawsInEveryScene() {
+        let scenes: [KaraokeScene] = [
+            .title, .interlude(showBanner: false), .countdown(upcoming: 0, stars: 3),
+            .singing(index: 0, sweep: .linear(0.5)), .held(index: 0),
+        ]
+        for scene in scenes {
+            let plain = render(scene)
+            let urgent = render(scene, notice: "♪ 無法儲存這首歌的設定", urgent: true)
+            #expect(urgent != plain, "an urgent notice should change the picture for \(scene)")
+        }
+    }
+
+    @Test @MainActor func idleUrgentNoticeIsDrawnOnce() {
+        let normal = render(.idle, notice: "♪ 匯入失敗")
+        let urgent = render(.idle, notice: "♪ 匯入失敗", urgent: true)
+        #expect(urgent == normal)
+    }
+
     @Test @MainActor func singleLineStyleCentersTheLine() throws {
         let settings = OverlaySettings.defaults.with(\.style, StylePreset.quiet.style)
         let image = render(.held(index: 0), settings: settings)
@@ -132,14 +159,15 @@ import Testing
         line: String = "測試字幕一二三四",
         words: [String]? = nil,
         settings: OverlaySettings = .defaults,
-        notice: String? = nil
+        notice: String? = nil,
+        urgent: Bool = false
     ) -> RenderedImage {
         let timings = words?.enumerated().map { WordTiming(text: $1, start: Double($0), duration: 1) }
         let text = words?.joined() ?? line
         let fixture = LyricLine(start: 0, end: 4, holdEnd: 8, text: text, slot: 1, words: timings)
         let content = OverlayContent(
             scene: scene, lines: [fixture], title: "測試歌名", artist: "歌手",
-            credits: ["作詞：甲"], notice: notice, usesRedTitle: true
+            credits: ["作詞：甲"], notice: notice, noticeIsUrgent: urgent, usesRedTitle: true
         )
         let view = OverlayView(frame: NSRect(origin: .zero, size: canvas))
         view.settings = settings
@@ -149,7 +177,7 @@ import Testing
 }
 
 /// RGBA8 pixels of a snapshot, top row first. Sized in pixels, which may be 2x the view's points.
-private struct RenderedImage {
+private struct RenderedImage: Equatable {
     enum Region { case leftHalfOfLine, rightHalfOfLine }
 
     private static let tolerance = 8
@@ -179,6 +207,13 @@ private struct RenderedImage {
 
     var touchesLeftOrRightEdge: Bool {
         (0..<height).contains { alpha(x: 0, y: $0) > 0 || alpha(x: width - 1, y: $0) > 0 }
+    }
+
+    /// Whether any visible pixel lies above `rows` rows counted up from the bottom edge.
+    func hasInk(aboveRowsFromBottom rows: Int) -> Bool {
+        let lastRow = height - 1 - rows
+        guard lastRow >= 0 else { return false }
+        return (0...lastRow).contains { y in (0..<width).contains { alpha(x: $0, y: y) > 0 } }
     }
 
     /// Columns holding at least one visible pixel, first through last.

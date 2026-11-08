@@ -346,6 +346,29 @@ import Testing
         #expect(resolver.resolveCalls.count == 2)
     }
 
+    @Test @MainActor func importFailureIsUrgentAndShownOverLyrics() async {
+        let rig = Self.rig(on: FakeResolver(outcomes: ["歌": Self.found()]))
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        #expect(rig.coordinator.content().noticeIsUrgent == false)
+        rig.coordinator.importLRC("沒有時間的文字")
+        let content = rig.coordinator.content()
+        #expect(content.scene == .title)
+        #expect(content.notice?.hasPrefix("♪ 匯入失敗") == true)
+        #expect(content.noticeIsUrgent)
+        rig.time.value += 7
+        #expect(rig.coordinator.content().noticeIsUrgent == false)
+    }
+
+    @Test @MainActor func lookupNoticesAreNotUrgent() async {
+        let rig = Self.rig()
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        let content = rig.coordinator.content()
+        #expect(content.notice != nil)
+        #expect(content.noticeIsUrgent == false)
+    }
+
     @Test @MainActor func lookupNoticeExpiresAfterEightSeconds() async {
         let latch = Latch()
         let rig = Self.rig(on: FakeResolver(stalls: ["歌": latch]))

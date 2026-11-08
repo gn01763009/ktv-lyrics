@@ -8,6 +8,8 @@ public struct OverlayContent: Equatable {
     public let artist: String?
     public let credits: [String]
     public let notice: String?
+    /// An urgent notice (an import or save failure) is drawn in every scene. Other notices show only when idle.
+    public let noticeIsUrgent: Bool
     public let usesRedTitle: Bool
 
     public init(
@@ -17,6 +19,7 @@ public struct OverlayContent: Equatable {
         artist: String? = nil,
         credits: [String] = [],
         notice: String? = nil,
+        noticeIsUrgent: Bool = false,
         usesRedTitle: Bool = true
     ) {
         self.scene = scene
@@ -25,6 +28,7 @@ public struct OverlayContent: Equatable {
         self.artist = artist
         self.credits = credits
         self.notice = notice
+        self.noticeIsUrgent = noticeIsUrgent
         self.usesRedTitle = usesRedTitle
     }
 

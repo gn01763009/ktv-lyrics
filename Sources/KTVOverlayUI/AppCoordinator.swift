@@ -189,7 +189,8 @@ public final class AppCoordinator {
         remember(SongOverride(offset: track.songOverride.offset, importedLRC: raw, candidateID: nil), for: track)
     }
 
-    /// Shows a short message on the overlay.
+    /// Shows a short message on the overlay. It is urgent: every notice posted here reports a failure
+    /// the user must see, so it is drawn even while lyrics are on screen.
     public func postNotice(_ text: String) {
         userNotice = TimedNotice(text: text, since: now())
     }
@@ -210,6 +211,7 @@ public final class AppCoordinator {
             artist: track.query.artist,
             credits: loaded?.lyrics.credits ?? [],
             notice: notice(for: track),
+            noticeIsUrgent: activeUserNotice() != nil,
             usesRedTitle: track.usesRedTitle
         )
     }
@@ -239,7 +241,8 @@ public final class AppCoordinator {
     }
 
     private func noticeOnly() -> OverlayContent {
-        OverlayContent(scene: .idle, lines: [], title: "", notice: activeUserNotice())
+        let notice = activeUserNotice()
+        return OverlayContent(scene: .idle, lines: [], title: "", notice: notice, noticeIsUrgent: notice != nil)
     }
 
     private func activeUserNotice() -> String? {
