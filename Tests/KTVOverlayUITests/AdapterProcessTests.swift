@@ -19,14 +19,16 @@ import Testing
     private func make(
         _ executable: String,
         _ arguments: [String],
-        recorder: Recorder
+        recorder: Recorder,
+        stableUptime: Double = 30
     ) -> AdapterProcess {
         AdapterProcess(
             executable: executable,
             arguments: arguments,
             onEvent: recorder.add,
             onStatus: recorder.add,
-            restartDelay: { _ in 0.01 }
+            restartDelay: { _ in 0.01 },
+            stableUptime: stableUptime
         )
     }
 
@@ -74,15 +76,32 @@ import Testing
         #expect(recorder.statuses.filter { if case .restarting = $0 { return true } else { return false } }.count == 7)
     }
 
-    @Test @MainActor func deliveredEventResetsFailureCount() async {
+    @Test @MainActor func rowsAloneDoNotResetTheBackoff() async {
         let recorder = Recorder()
         let process = make("/bin/sh", ["-c", "printf '%s\\n' '\(json)'; exit 1"], recorder: recorder)
         process.start()
-        let seen = await waitUntil { recorder.statuses.filter { $0 == .running }.count >= 12 }
+        let failed = await waitUntil { recorder.statuses.contains(.failed) }
+        process.stop()
+        #expect(failed)
+        #expect(recorder.statuses.filter { if case .restarting = $0 { return true } else { return false } }.count == 7)
+        #expect(recorder.events.contains { if case .playing = $0 { return true } else { return false } })
+    }
+
+    @Test @MainActor func stayingUpResetsTheFailureCount() async {
+        let recorder = Recorder()
+        let process = make(
+            "/bin/sh", ["-c", "printf '%s\\n' '\(json)'; sleep 0.3; exit 1"], recorder: recorder, stableUptime: 0.1
+        )
+        process.start()
+        let seen = await waitUntil { recorder.statuses.filter { $0 == .running }.count >= 10 }
         process.stop()
         #expect(seen)
         #expect(!recorder.statuses.contains(.failed))
         #expect(!recorder.statuses.contains(.restarting(attempt: 1)))
+    }
+
+    @Test func stableUptimeIsThirtySeconds() {
+        #expect(AdapterProcess.stableUptimeSeconds == 30)
     }
 
     @Test @MainActor func stopPreventsRestart() async {

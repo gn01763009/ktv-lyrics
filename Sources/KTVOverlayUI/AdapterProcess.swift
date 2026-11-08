@@ -13,6 +13,9 @@ public enum AdapterStatus: Equatable, Sendable {
 public final class AdapterProcess {
     private static let logger = Logger(subsystem: "KTVLyrics", category: "AdapterProcess")
     private static let maxConsecutiveFailures = 8
+    /// Seconds the helper must stay up before its earlier failures are forgotten. It prints a row as soon as it
+    /// starts, so receiving a row says nothing about whether it is healthy.
+    public static let stableUptimeSeconds: Double = 30
     private static let newline = UInt8(ascii: "\n")
 
     private let executable: String
@@ -20,24 +23,28 @@ public final class AdapterProcess {
     private let onEvent: (AdapterEvent) -> Void
     private let onStatus: (AdapterStatus) -> Void
     private let restartDelay: (Int) -> Double
+    private let stableUptime: Double
 
     private var process: Process?
     private var generation = 0
     private var consecutiveFailures = 0
     private var stopped = true
+    private var launchedAt: Date?
 
     public init(
         executable: String,
         arguments: [String],
         onEvent: @escaping (AdapterEvent) -> Void,
         onStatus: @escaping (AdapterStatus) -> Void,
-        restartDelay: @escaping (Int) -> Double = RestartPolicy.delay
+        restartDelay: @escaping (Int) -> Double = RestartPolicy.delay,
+        stableUptime: Double = AdapterProcess.stableUptimeSeconds
     ) {
         self.executable = executable
         self.arguments = arguments
         self.onEvent = onEvent
         self.onStatus = onStatus
         self.restartDelay = restartDelay
+        self.stableUptime = stableUptime
     }
 
     public func start() {
@@ -73,6 +80,7 @@ public final class AdapterProcess {
             return
         }
         process = child
+        launchedAt = Date()
         onStatus(.running)
         read(pipe.fileHandleForReading, token: token)
     }
@@ -107,14 +115,21 @@ public final class AdapterProcess {
         case .ignored:
             Self.logger.debug("Ignored adapter row: \(String(decoding: line, as: UTF8.self), privacy: .public)")
         case let event:
-            consecutiveFailures = 0
             onEvent(event)
         }
+    }
+
+    /// A helper that ran for `stableUptime` seconds was healthy, so its exit starts the backoff from the beginning.
+    private func forgetFailuresIfItStayedUp() {
+        defer { launchedAt = nil }
+        guard let launchedAt, Date().timeIntervalSince(launchedAt) >= stableUptime else { return }
+        consecutiveFailures = 0
     }
 
     private func handleExit(token: Int) {
         guard token == generation, !stopped else { return }
         process = nil
+        forgetFailuresIfItStayedUp()
         let attempt = consecutiveFailures
         consecutiveFailures += 1
         guard consecutiveFailures < Self.maxConsecutiveFailures else {
