@@ -6,10 +6,12 @@ public enum YouTubeTitleParser {
     private static let dashSeparator = " - "
     /// Bracket pairs whose inner text names the song, checked in this order.
     private static let bracketPairs: [(open: String, close: String)] = [("【", "】"), ("《", "》")]
+    /// Bracket text containing any of these (lowercased) is a version tag such as `Official MV`, not a song name.
+    private static let genericBracketTags = ["official", "mv", "live", "lyric", "hd", "4k", "官方", "ktv", "完整版"]
 
     /// Splits a tab title into `(title, artist)`. Each rule is tried in order and the first that applies wins:
     /// 1. A `Channel - Topic` channel is an auto-generated artist channel: the title is the song.
-    /// 2. A title with `【…】` or `《…》` holding text names the song inside the brackets.
+    /// 2. A title with `【…】` or `《…》` naming a song inside the brackets (not a generic tag, and not after ` - `).
     /// 3. A title with ` - ` is `artist - song`, unless its right side is the channel, then the sides swap.
     /// 4. Otherwise the cleaned title is the song and the channel is the artist.
     public static func parse(title: String, channel: String?) -> (title: String, artist: String?) {
@@ -21,7 +23,7 @@ public enum YouTubeTitleParser {
             return (TitleNormalizer.clean(trimmedTitle), nonEmpty(artist))
         }
         if let bracketed = bracketedTitle(in: trimmedTitle) {
-            return (bracketed.title, nonEmpty(bracketed.before) ?? channelName)
+            return (bracketed.title, nonEmpty(bracketed.artist) ?? channelName)
         }
         if let dash = trimmedTitle.range(of: dashSeparator) {
             let left = String(trimmedTitle[..<dash.lowerBound])
@@ -34,18 +36,29 @@ public enum YouTubeTitleParser {
         return (TitleNormalizer.clean(trimmedTitle), channelName)
     }
 
-    /// The first bracket pair with text inside it: the text before the bracket, and the first word inside it.
-    private static func bracketedTitle(in text: String) -> (before: String, title: String)? {
+    /// The first bracket pair that names a song: its first word is the title, and the cleaned text before it is the artist.
+    /// A pair is skipped when the text before it contains ` - ` (the dash rule handles that) or when its text is a generic tag.
+    private static func bracketedTitle(in text: String) -> (artist: String, title: String)? {
         for pair in bracketPairs {
             guard let open = text.range(of: pair.open),
                   let close = text.range(of: pair.close, range: open.upperBound..<text.endIndex) else {
                 continue
             }
-            let inner = text[open.upperBound..<close.lowerBound]
-            guard let firstWord = inner.split(whereSeparator: \.isWhitespace).first else { continue }
-            return (String(text[..<open.lowerBound]), String(firstWord))
+            let before = String(text[..<open.lowerBound])
+            let inner = String(text[open.upperBound..<close.lowerBound])
+            guard let firstWord = inner.split(whereSeparator: \.isWhitespace).first,
+                  !before.contains(dashSeparator),
+                  !isGenericTag(inner) else {
+                continue
+            }
+            return (TitleNormalizer.clean(before), String(firstWord))
         }
         return nil
+    }
+
+    private static func isGenericTag(_ text: String) -> Bool {
+        let lowered = text.lowercased()
+        return genericBracketTags.contains { lowered.contains($0) }
     }
 
     /// The text trimmed of surrounding whitespace, or nil when nothing is left.

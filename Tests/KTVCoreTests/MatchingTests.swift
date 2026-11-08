@@ -87,6 +87,16 @@ import Testing
         #expect(r.title == "告白氣球" && r.artist == "周杰倫")
     }
 
+    @Test func youtubeDashBeforeBracketFallsThrough() {
+        let r = YouTubeTitleParser.parse(title: "五月天 Mayday - 溫柔【Official MV】", channel: "五月天")
+        #expect(r.title == "溫柔" && r.artist == "五月天 Mayday")
+    }
+
+    @Test func youtubeGenericBracketIsSkipped() {
+        let r = YouTubeTitleParser.parse(title: "Song 【MV】", channel: nil)
+        #expect(r.title == "Song" && r.artist == nil)
+    }
+
     @Test func youtubeDashTitle() {
         let r = YouTubeTitleParser.parse(title: "五月天 Mayday - 溫柔 (Official Music Video)", channel: nil)
         #expect(r.title == "溫柔" && r.artist == "五月天 Mayday")
