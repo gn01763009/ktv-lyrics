@@ -28,4 +28,8 @@ public enum LyricsTiming {
     public static let holdSecondsPerChar: Double = 0.8
     /// Assumed distance (seconds) to the next stamp after the final lyric line.
     public static let lastLineGap: Double = 6
+    /// Duration tolerance (seconds) for a lyrics candidate whose artist matches the playing track.
+    public static let matchSameArtistSeconds: Double = 3
+    /// Duration tolerance (seconds) for a lyrics candidate whose artist differs or is missing.
+    public static let matchOtherArtistSeconds: Double = 1
 }
