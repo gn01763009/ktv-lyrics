@@ -20,4 +20,12 @@ public enum LyricsTiming {
     public static let lineGapMargin: Double = 0.12
     /// How long the last line stays on screen after it ends.
     public static let trailingHold: Double = 3
+    /// Shortest time (seconds) a line is ever shown or held.
+    public static let minLineSeconds: Double = 0.4
+    /// Shortest hold (seconds) for a line, so short lines still stay readable.
+    public static let minHoldSeconds: Double = 8
+    /// Seconds per character used to estimate how long a line stays held.
+    public static let holdSecondsPerChar: Double = 0.8
+    /// Assumed distance (seconds) to the next stamp after the final lyric line.
+    public static let lastLineGap: Double = 6
 }
