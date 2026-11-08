@@ -19,6 +19,7 @@ cp "$BIN_DIR/KTVLyrics" "$CONTENTS/MacOS/KTVLyrics"
 cp Resources/Info.plist "$CONTENTS/Info.plist"
 cp Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$RESOURCES/mediaremote-adapter.pl"
 cp -R build/adapter/MediaRemoteAdapter.framework "$RESOURCES/MediaRemoteAdapter.framework"
+cp THIRD_PARTY_NOTICES.md "$RESOURCES/THIRD_PARTY_NOTICES.md"
 
 codesign --force --deep --sign - "$APP"
 echo "Built $APP"
