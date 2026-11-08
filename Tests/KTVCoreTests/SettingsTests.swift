@@ -51,6 +51,7 @@ import Testing
     @Test func neonColors() {
         #expect(StylePreset.neon.style.sungStroke == RGBAColor(hex: 0x3B1060))
         #expect(StylePreset.neon.style.sungFill == RGBAColor(hex: 0xFF5FD2))
+        #expect(StylePreset.neon.style.unsungStroke == RGBAColor(hex: 0x3B1060))
         #expect(StylePreset.neon.style.unsungFill == RGBAColor(hex: 0xFFFFFF))
         #expect(StylePreset.neon.style.strokeWidth == 16)
         #expect(StylePreset.neon.style.fontName == "PingFangTC-Semibold")
@@ -68,6 +69,7 @@ import Testing
 
     @Test func goldColorsAndFont() {
         #expect(StylePreset.gold.style.unsungFill == RGBAColor(hex: 0xFFF8E6))
+        #expect(StylePreset.gold.style.unsungStroke == RGBAColor(hex: 0x4D2500))
         #expect(StylePreset.gold.style.sungStroke == RGBAColor(hex: 0x4D2500))
         #expect(StylePreset.gold.style.sungFill == RGBAColor(hex: 0xFFB516))
         #expect(StylePreset.gold.style.fontName == "Kaiti TC")

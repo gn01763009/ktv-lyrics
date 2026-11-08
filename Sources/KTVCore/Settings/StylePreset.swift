@@ -87,7 +87,7 @@ public enum StylePreset: String, CaseIterable, Codable, Sendable {
     )
     private static let neonStyle = OverlayStyle(
         unsungFill: RGBAColor(hex: 0xFFFFFF),
-        unsungStroke: RGBAColor(hex: 0x000000),
+        unsungStroke: RGBAColor(hex: 0x3B1060),
         sungFill: RGBAColor(hex: 0xFF5FD2),
         sungStroke: RGBAColor(hex: 0x3B1060),
         strokeWidth: 16,
@@ -107,7 +107,7 @@ public enum StylePreset: String, CaseIterable, Codable, Sendable {
     )
     private static let goldStyle = OverlayStyle(
         unsungFill: RGBAColor(hex: 0xFFF8E6),
-        unsungStroke: RGBAColor(hex: 0x000000),
+        unsungStroke: RGBAColor(hex: 0x4D2500),
         sungFill: RGBAColor(hex: 0xFFB516),
         sungStroke: RGBAColor(hex: 0x4D2500),
         strokeWidth: 20,
