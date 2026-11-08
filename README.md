@@ -16,10 +16,8 @@ macOS 選單列 app，在畫面上印出 KTV 風格的卡拉 OK 字幕。字幕�
 需要 macOS 與 Xcode 開發工具（沒有的話先執行 `xcode-select --install`）。
 
 ```sh
-git clone <repo> && cd ktv-lyrics && make install
+git clone https://github.com/gn01763009/ktv-lyrics.git && cd ktv-lyrics && make install
 ```
-
-`<repo>` 是公開後的 repository 位址，目前尚未公開，公開後會替換。
 
 `make install` 會先編譯 app，然後刪除舊的 `/Applications/KTV Lyrics.app`（如果有），再用 `ditto` 複製新的 app 過去。**執行 `make install` 前請先結束 KTV Lyrics**（選單列 ♪ → 結束），避免替換正在執行的 app。只想編譯、不安裝，執行 `make app`，產物在 `build/KTV Lyrics.app`。
 
