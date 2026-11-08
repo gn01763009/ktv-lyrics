@@ -51,6 +51,13 @@ import Testing
         #expect(await resolver(lrclib: .otherSong, netease: .otherSong).resolve(q) == .notFound)
     }
 
+    @Test func neteaseWrongSongIsRejected() async {
+        let o = await resolver(lrclib: .otherSong, netease: .otherSong).resolve(q)
+        #expect(o.lyrics?.source != .netease)
+        let found = await resolver(lrclib: .otherSong, netease: .otherSong).candidates(q)
+        #expect(!found.contains { $0.id.hasPrefix("netease-") })
+    }
+
     @Test func malformedResponsesAreNotFound() async {
         #expect(await resolver(lrclib: .garbage, netease: .garbage).resolve(q) == .notFound)
     }

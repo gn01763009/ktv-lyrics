@@ -87,7 +87,11 @@ extension FakeHTTP {
         case .failing:
             return [search: .failure(URLError(.timedOut))]
         case .otherSong:
-            return [search: .success(neteaseSearchJSON(title: "盛夏", id: 10))]
+            // The lyric route answers with real lyrics, so a resolver that skips the title check would show them.
+            return [
+                search: .success(neteaseSearchJSON(title: "盛夏", id: 10)),
+                lyric: .success(neteaseLyricJSON(yrc: true)),
+            ]
         case .garbage:
             return [search: .success(Data("not json".utf8))]
         }
