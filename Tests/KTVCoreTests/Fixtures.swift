@@ -14,6 +14,14 @@ func parsed(gaps: [Double], chars: Int) -> ParsedLRC {
     ParsedLRC(stamps: stamps(gaps: gaps, chars: chars), credits: [])
 }
 
+/// `count + 1` lines where each consecutive pair has 12 seconds of silence between `holdEnd` and the next `start`.
+func gapped(_ count: Int) -> [LyricLine] {
+    (0...count).map { index in
+        let start = Double(index) * 14
+        return LyricLine(start: start, end: start + 2, holdEnd: start + 2, text: "第\(index)句")
+    }
+}
+
 /// Shared LRC sample text for the KTVCore test targets.
 enum Fixtures {
     /// Fifteen plain lines at 10s..24s, then a speaker-labelled line at 40s.
