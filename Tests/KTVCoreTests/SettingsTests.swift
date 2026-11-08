@@ -181,4 +181,81 @@ import Testing
         #expect(abs(placed.minX - original.minX) < 1)
         #expect(abs(placed.minY - original.minY) < 1)
     }
+
+    // MARK: Validation on decode
+
+    /// Decodes the defaults encoded as JSON, after `edit` has changed the JSON object.
+    private func decodeEdited(_ edit: (inout [String: Any]) throws -> Void) throws -> OverlaySettings {
+        var object = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(OverlaySettings.defaults)) as? [String: Any]
+        )
+        try edit(&object)
+        return try JSONDecoder().decode(OverlaySettings.self, from: JSONSerialization.data(withJSONObject: object))
+    }
+
+    /// Changes the nested `style` object of an encoded settings JSON object.
+    private func editStyle(_ object: inout [String: Any], _ edit: (inout [String: Any]) -> Void) throws {
+        var style = try #require(object["style"] as? [String: Any])
+        edit(&style)
+        object["style"] = style
+    }
+
+    @Test func decodeClampsSizeAndOpacityAboveAndBelowRange() throws {
+        let low = try decodeEdited { object in
+            object["size"] = 0
+            object["opacity"] = 5
+        }
+        #expect(low.size == 16)
+        #expect(low.opacity == 1)
+        let high = try decodeEdited { object in
+            object["size"] = 500
+            object["opacity"] = 0.01
+        }
+        #expect(high.size == 96)
+        #expect(high.opacity == 0.1)
+    }
+
+    @Test func decodeClampsStrokeWidthAndScale() throws {
+        let decoded = try decodeEdited { object in
+            try editStyle(&object) { style in
+                style["strokeWidth"] = -3
+                style["scale"] = 9
+            }
+        }
+        #expect(decoded.style.strokeWidth == 0)
+        #expect(decoded.style.scale == 2)
+    }
+
+    @Test func decodeClampsColorChannels() throws {
+        let fill: [String: Any] = ["r": 9, "g": -2, "b": 0.5, "a": 3]
+        let decoded = try decodeEdited { object in
+            try editStyle(&object) { style in style["sungFill"] = fill }
+        }
+        #expect(decoded.style.sungFill == RGBAColor(r: 1, g: 0, b: 0.5, a: 1))
+    }
+
+    @Test func decodeClampsAnchor() throws {
+        let anchor: [String: Any] = ["x": 7, "y": -0.5]
+        let decoded = try decodeEdited { object in object["anchor"] = anchor }
+        #expect(decoded.anchor == NormalizedPoint(x: 1, y: 0))
+    }
+
+    @Test func nonFiniteNumbersFallBackToDefaults() {
+        #expect(RGBAColor(r: .nan, g: 0, b: 0, a: .infinity) == RGBAColor(r: 0, g: 0, b: 0, a: 1))
+        #expect(NormalizedPoint(x: .nan, y: 0.5) == NormalizedPoint(x: 0, y: 0.5))
+        let settings = OverlaySettings(
+            size: .nan, opacity: .infinity, preset: .classic, style: StylePreset.classic.style,
+            showTitleCard: true, showCountdown: true, showBanner: true, useNetEase: true,
+            launchAtLogin: false, anchor: NormalizedPoint(x: 0.5, y: 0.05), displayID: nil
+        )
+        #expect(settings.size == OverlaySettings.defaults.size)
+        #expect(settings.opacity == OverlaySettings.defaults.opacity)
+        let style = OverlayStyle(
+            unsungFill: RGBAColor(hex: 0xFFFFFF), unsungStroke: RGBAColor(hex: 0x000000),
+            sungFill: RGBAColor(hex: 0x1746E0), sungStroke: RGBAColor(hex: 0xFFFFFF),
+            strokeWidth: .infinity, fontName: "PingFangTC-Semibold", scale: .nan, singleLine: false
+        )
+        #expect(style.strokeWidth == StylePreset.classic.style.strokeWidth)
+        #expect(style.scale == StylePreset.classic.style.scale)
+    }
 }

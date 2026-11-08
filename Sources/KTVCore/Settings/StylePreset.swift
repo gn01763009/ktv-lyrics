@@ -1,14 +1,24 @@
 import Foundation
 
-/// A color with 0...1 channels. Channels are clamped on construction.
+/// A color with 0...1 channels. Channels are clamped on construction and on decode.
 public struct RGBAColor: Equatable, Codable, Sendable {
     public let r, g, b, a: Double
 
-    public init(r: Double, g: Double, b: Double, a: Double = 1) {
-        self.r = Self.clamp(r)
-        self.g = Self.clamp(g)
-        self.b = Self.clamp(b)
-        self.a = Self.clamp(a)
+    public init(r: Double, g: Double, b: Double, a: Double = SettingBounds.defaultAlpha) {
+        self.r = SettingBounds.channel.validated(r, fallback: SettingBounds.defaultChannel)
+        self.g = SettingBounds.channel.validated(g, fallback: SettingBounds.defaultChannel)
+        self.b = SettingBounds.channel.validated(b, fallback: SettingBounds.defaultChannel)
+        self.a = SettingBounds.channel.validated(a, fallback: SettingBounds.defaultAlpha)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            r: try container.decode(Double.self, forKey: .r),
+            g: try container.decode(Double.self, forKey: .g),
+            b: try container.decode(Double.self, forKey: .b),
+            a: try container.decode(Double.self, forKey: .a)
+        )
     }
 
     /// A color from a `0xRRGGBB` literal.
@@ -25,10 +35,6 @@ public struct RGBAColor: Equatable, Codable, Sendable {
 
     private static func channel(_ hex: UInt32, shift: UInt32) -> Double {
         Double((hex >> shift) & 0xFF) / channelMax
-    }
-
-    private static func clamp(_ value: Double) -> Double {
-        min(max(value, 0), 1)
     }
 }
 
@@ -55,10 +61,25 @@ public struct OverlayStyle: Equatable, Codable, Sendable {
         self.unsungStroke = unsungStroke
         self.sungFill = sungFill
         self.sungStroke = sungStroke
-        self.strokeWidth = strokeWidth
+        self.strokeWidth = SettingBounds.strokeWidth.validated(strokeWidth, fallback: SettingBounds.defaultStrokeWidth)
         self.fontName = fontName
-        self.scale = scale
+        self.scale = SettingBounds.scale.validated(scale, fallback: SettingBounds.defaultScale)
         self.singleLine = singleLine
+    }
+
+    /// Decodes through `init`, so stroke width and scale are clamped.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            unsungFill: try container.decode(RGBAColor.self, forKey: .unsungFill),
+            unsungStroke: try container.decode(RGBAColor.self, forKey: .unsungStroke),
+            sungFill: try container.decode(RGBAColor.self, forKey: .sungFill),
+            sungStroke: try container.decode(RGBAColor.self, forKey: .sungStroke),
+            strokeWidth: try container.decode(Double.self, forKey: .strokeWidth),
+            fontName: try container.decode(String.self, forKey: .fontName),
+            scale: try container.decode(Double.self, forKey: .scale),
+            singleLine: try container.decode(Bool.self, forKey: .singleLine)
+        )
     }
 }
 

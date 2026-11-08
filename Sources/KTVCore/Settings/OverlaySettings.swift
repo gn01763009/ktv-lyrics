@@ -2,13 +2,21 @@ import CoreGraphics
 import Foundation
 import os
 
-/// A point in 0...1 coordinates. Values are clamped on construction.
+/// A point in 0...1 coordinates. Values are clamped on construction and on decode.
 public struct NormalizedPoint: Equatable, Codable, Sendable {
     public let x, y: Double
 
     public init(x: Double, y: Double) {
-        self.x = min(max(x, 0), 1)
-        self.y = min(max(y, 0), 1)
+        self.x = SettingBounds.anchor.validated(x, fallback: SettingBounds.defaultAnchor)
+        self.y = SettingBounds.anchor.validated(y, fallback: SettingBounds.defaultAnchor)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            x: try container.decode(Double.self, forKey: .x),
+            y: try container.decode(Double.self, forKey: .y)
+        )
     }
 }
 
@@ -24,8 +32,8 @@ public struct OverlaySettings: Equatable, Codable, Sendable {
     public var displayID: String?
 
     public static let defaults = OverlaySettings(
-        size: 46,
-        opacity: 1,
+        size: SettingBounds.defaultSize,
+        opacity: SettingBounds.defaultOpacity,
         preset: .classic,
         style: StylePreset.classic.style,
         showTitleCard: true,
@@ -50,8 +58,8 @@ public struct OverlaySettings: Equatable, Codable, Sendable {
         anchor: NormalizedPoint,
         displayID: String?
     ) {
-        self.size = size
-        self.opacity = opacity
+        self.size = SettingBounds.size.validated(size, fallback: SettingBounds.defaultSize)
+        self.opacity = SettingBounds.opacity.validated(opacity, fallback: SettingBounds.defaultOpacity)
         self.preset = preset
         self.style = style
         self.showTitleCard = showTitleCard
@@ -65,6 +73,7 @@ public struct OverlaySettings: Equatable, Codable, Sendable {
 
     /// Decodes every field with `decodeIfPresent`, so older or partial JSON keeps defaults for the rest.
     /// An unknown preset falls back to classic. A missing style follows the decoded preset.
+    /// Size, opacity, and the style and anchor values are clamped through their initializers.
     public init(from decoder: Decoder) throws {
         let fallback = Self.defaults
         let container = try decoder.container(keyedBy: CodingKeys.self)
