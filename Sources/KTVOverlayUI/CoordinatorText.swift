@@ -20,6 +20,8 @@ enum CoordinatorText {
 
     static func lookupNotice(_ title: String) -> String { "♪ 正在找《\(title)》的字幕" }
     static func notFoundNotice(_ title: String) -> String { "♪ 找不到《\(title)》的字幕" }
+    static let unavailableNotice = "♪ 暫時查不到字幕，下次播放會再試一次"
+    static func unavailable(_ title: String) -> String { "暫時查不到：\(title)" }
     static func searching(_ title: String) -> String { "查詢中：\(title)" }
     static func notFound(_ title: String) -> String { "找不到字幕：\(title)" }
 

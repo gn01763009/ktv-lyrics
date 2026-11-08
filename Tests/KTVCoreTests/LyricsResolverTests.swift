@@ -44,7 +44,39 @@ import Testing
     }
 
     @Test func neteaseFailureFallsBack() async {
-        #expect(await resolver(netease: .failing).resolve(q).lyrics?.source == .lrclib)
+        let o = await resolver(netease: .failing).resolve(q)
+        #expect(o.lyrics?.source == .lrclib)
+        guard case .foundPartial = o else {
+            Issue.record("expected .foundPartial, got \(o)")
+            return
+        }
+    }
+
+    @Test func lrclibFailureIsPartialAndWordTimingIsNotValidated() async {
+        // The word timing is two seconds off, which the version check would reject. With LRCLIB down it cannot run.
+        let o = await resolver(lrclib: .failing, netease: .wordTimed(offset: 2)).resolve(q)
+        guard case .foundPartial(let lyrics) = o else {
+            Issue.record("expected .foundPartial, got \(o)")
+            return
+        }
+        #expect(lyrics.source == .netease && lyrics.isWordTimed)
+    }
+
+    @Test func everyProviderFailingIsUnavailable() async {
+        #expect(await resolver(lrclib: .failing, netease: .failing).resolve(q) == .unavailable)
+    }
+
+    @Test func oneProviderFailingWithNothingFromTheOtherIsUnavailable() async {
+        #expect(await resolver(lrclib: .empty, netease: .failing).resolve(q) == .unavailable)
+        #expect(await resolver(lrclib: .failing, netease: .otherSong).resolve(q) == .unavailable)
+    }
+
+    @Test func partialOutcomesStillExposeTheirLyrics() {
+        let lyrics = Lyrics(source: .lrclib, lines: lines(at: [1]), credits: [])
+        #expect(LyricsOutcome.found(lyrics).lyrics == lyrics)
+        #expect(LyricsOutcome.foundPartial(lyrics).lyrics == lyrics)
+        #expect(LyricsOutcome.notFound.lyrics == nil)
+        #expect(LyricsOutcome.unavailable.lyrics == nil)
     }
 
     @Test func nothingMatchesIsNotFound() async {
@@ -58,8 +90,8 @@ import Testing
         #expect(!found.contains { $0.id.hasPrefix("netease-") })
     }
 
-    @Test func malformedResponsesAreNotFound() async {
-        #expect(await resolver(lrclib: .garbage, netease: .garbage).resolve(q) == .notFound)
+    @Test func malformedResponsesAreProviderFailures() async {
+        #expect(await resolver(lrclib: .garbage, netease: .garbage).resolve(q) == .unavailable)
     }
 
     @Test func validatorComparesMedianLineStart() {

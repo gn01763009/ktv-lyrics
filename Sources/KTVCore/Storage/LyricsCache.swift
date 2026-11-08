@@ -47,11 +47,16 @@ public struct LyricsCache: Sendable {
         case .notFound:
             let age = now().timeIntervalSince(entry.savedAt)
             return age < Self.notFoundLifetime ? entry.outcome : nil
+        case .foundPartial, .unavailable:
+            // Never written by the app, but an old or hand-edited file may hold one: ignore it.
+            return nil
         }
     }
 
     /// Stores the outcome, creating the cache directory on first use.
+    /// Outcomes that are not `isCacheable` (a provider failed) are skipped, so a network failure is never remembered.
     public func save(_ outcome: LyricsOutcome, for query: TrackQuery) throws {
+        guard outcome.isCacheable else { return }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(Entry(outcome: outcome, savedAt: now()))
         try data.write(to: fileURL(for: query), options: .atomic)

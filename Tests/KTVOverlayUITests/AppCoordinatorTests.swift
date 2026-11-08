@@ -269,6 +269,30 @@ import Testing
         #expect(rig.coordinator.content().notice == nil)
     }
 
+    @Test @MainActor func unavailableShowsRetryNoticeAndIsNotCached() async {
+        let rig = Self.rig(on: FakeResolver(outcomes: ["歌": .unavailable]))
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        let content = rig.coordinator.content()
+        #expect(content.notice == "♪ 暫時查不到字幕，下次播放會再試一次")
+        #expect(content.scene == .idle)
+        #expect(rig.coordinator.statusText == "暫時查不到：歌")
+        let query = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, now: rig.time.value))
+        #expect(rig.cache.load(query) == nil)
+        rig.time.value += 7
+        #expect(rig.coordinator.content().notice == nil)
+    }
+
+    @Test @MainActor func partialOutcomeShowsLyricsButIsNotCached() async {
+        let lyrics = Lyrics(source: .lrclib, lines: [Self.line("部分", start: 20)], credits: [])
+        let rig = Self.rig(on: FakeResolver(outcomes: ["歌": .foundPartial(lyrics)]))
+        defer { rig.cleanUp() }
+        await rig.playAndWait("歌")
+        #expect(rig.coordinator.content().lines.first?.text == "部分")
+        let query = TitleNormalizer.query(from: Self.snapshot("歌", elapsed: 2, now: rig.time.value))
+        #expect(rig.cache.load(query) == nil)
+    }
+
     @Test @MainActor func lookupNoticeExpiresAfterEightSeconds() async {
         let latch = Latch()
         let rig = Self.rig(on: FakeResolver(stalls: ["歌": latch]))

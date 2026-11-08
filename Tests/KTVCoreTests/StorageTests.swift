@@ -31,6 +31,16 @@ import Testing
         }
     }
 
+    @Test func incompleteOutcomesAreNotStored() throws {
+        try withTempDirectory { dir in
+            let cache = LyricsCache(directory: dir, now: { start })
+            try cache.save(.unavailable, for: query)
+            try cache.save(.foundPartial(lyrics), for: query)
+            #expect(cache.load(query) == nil)
+            #expect(!FileManager.default.fileExists(atPath: dir.path))
+        }
+    }
+
     @Test func notFoundExpiresAfterADay() throws {
         try withTempDirectory { dir in
             try LyricsCache(directory: dir, now: { start }).save(.notFound, for: query)

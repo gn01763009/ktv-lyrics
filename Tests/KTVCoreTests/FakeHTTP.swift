@@ -30,7 +30,7 @@ final class FakeHTTP: HTTPFetching, @unchecked Sendable {
 
 /// LRCLIB behaviours the resolver tests exercise.
 enum LRCLIBScenario {
-    case standard, withCredit, empty, otherSong, unsynced, garbage, freeTextOnly
+    case standard, withCredit, empty, otherSong, unsynced, garbage, freeTextOnly, failing
 }
 
 /// NetEase behaviours the resolver tests exercise. `offset` shifts word timing, in seconds.
@@ -64,6 +64,8 @@ extension FakeHTTP {
             return [host: .success(lrclibJSON(lines: nil))]
         case .garbage:
             return [host: .success(Data("not json".utf8))]
+        case .failing:
+            return [host: .failure(URLError(.notConnectedToInternet))]
         case .freeTextOnly:
             // The track_name query finds nothing, so the resolver must fall back to the free-text query.
             return [host: .success(lrclibJSON(lines: syncedLRC)), "track_name=": empty]

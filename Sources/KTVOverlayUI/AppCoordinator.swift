@@ -30,6 +30,7 @@ public final class AppCoordinator {
         case idle
         case searching(since: Double)
         case notFound(at: Double)
+        case unavailable(at: Double)
         case found
     }
 
@@ -196,7 +197,11 @@ public final class AppCoordinator {
         guard let track else { return CoordinatorText.waiting }
         let title = track.query.title
         if let loaded { return CoordinatorText.found(title, lyrics: loaded.lyrics) }
-        if case .notFound = lookup { return CoordinatorText.notFound(title) }
+        switch lookup {
+        case .notFound: return CoordinatorText.notFound(title)
+        case .unavailable: return CoordinatorText.unavailable(title)
+        default: break
+        }
         return CoordinatorText.searching(title)
     }
 
@@ -224,6 +229,8 @@ public final class AppCoordinator {
             return CoordinatorText.lookupNotice(title)
         case .notFound(let at) where now() - at < CoordinatorText.notFoundNoticeSeconds:
             return CoordinatorText.notFoundNotice(title)
+        case .unavailable(let at) where now() - at < CoordinatorText.notFoundNoticeSeconds:
+            return CoordinatorText.unavailableNotice
         default:
             return nil
         }
@@ -259,10 +266,12 @@ public final class AppCoordinator {
     private func finishLookup(_ outcome: LyricsOutcome, id: Int) {
         guard gate.accepts(id), let track else { return }
         switch outcome {
-        case .found(let lyrics):
+        case .found(let lyrics), .foundPartial(let lyrics):
             show(lyrics, for: track)
         case .notFound:
             lookup = .notFound(at: now())
+        case .unavailable:
+            lookup = .unavailable(at: now())
         }
     }
 

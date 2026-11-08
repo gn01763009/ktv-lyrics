@@ -1,17 +1,33 @@
 import Foundation
 import os
 
-/// The result of a lyrics lookup. `resolve` never fails: a track with no usable lyrics is `.notFound`.
+/// The result of a lyrics lookup. `resolve` never fails.
+/// `.found` and `.notFound` are trustworthy answers and may be cached. `.foundPartial` and `.unavailable`
+/// mean at least one enabled provider failed (network error or malformed response), so they must not be cached.
 public enum LyricsOutcome: Equatable, Codable, Sendable {
+    /// Usable lyrics, and every enabled provider answered.
     case found(Lyrics)
+    /// Usable lyrics, but at least one enabled provider failed.
+    case foundPartial(Lyrics)
+    /// Every enabled provider answered and none has usable lyrics.
     case notFound
+    /// Nothing usable, and at least one enabled provider failed.
+    case unavailable
 
     public var lyrics: Lyrics? {
         switch self {
-        case .found(let lyrics):
+        case .found(let lyrics), .foundPartial(let lyrics):
             return lyrics
-        case .notFound:
+        case .notFound, .unavailable:
             return nil
+        }
+    }
+
+    /// Whether the outcome is a complete answer that can be stored for later lookups.
+    public var isCacheable: Bool {
+        switch self {
+        case .found, .notFound: return true
+        case .foundPartial, .unavailable: return false
         }
     }
 }
@@ -50,11 +66,13 @@ public struct LyricsResolver: LyricsResolving {
     }
 
     public func resolve(_ query: TrackQuery) async -> LyricsOutcome {
-        let versions = await loadVersions(query)
+        let fetched = await fetchAll(query)
+        let versions = Self.versions(from: fetched, for: query)
+        let anyFailed = fetched.lrclibFailed || fetched.neteaseFailed
         guard let chosen = versions.neteaseWord ?? versions.bestLRCLIB ?? versions.neteaseLines else {
-            return .notFound
+            return anyFailed ? .unavailable : .notFound
         }
-        return .found(chosen.lyrics)
+        return anyFailed ? .foundPartial(chosen.lyrics) : .found(chosen.lyrics)
     }
 
     public func candidates(_ query: TrackQuery) async -> [LyricsCandidate] {
@@ -68,10 +86,13 @@ public struct LyricsResolver: LyricsResolving {
 
     // MARK: - Fetching
 
-    /// What the two providers returned for one track. Each part is nil or empty when that provider failed.
+    /// What the two providers returned for one track. A failed provider has an empty result and its flag set.
+    /// Word timing is checked against LRCLIB lines, so with `lrclibFailed` that check cannot run.
     private struct Fetched {
         let lrclibHits: [LRCLIBHit]
+        let lrclibFailed: Bool
         let netease: NetEaseMatch?
+        let neteaseFailed: Bool
     }
 
     /// The NetEase song that best matches the track, with its lyric fields.
@@ -81,26 +102,33 @@ public struct LyricsResolver: LyricsResolving {
     }
 
     private func fetchAll(_ query: TrackQuery) async -> Fetched {
-        async let hits = searchLRCLIB(query)
-        async let match = searchNetEase(query)
-        return Fetched(lrclibHits: await hits, netease: await match)
+        async let lrclibResult = searchLRCLIB(query)
+        async let neteaseResult = searchNetEase(query)
+        let (hits, lrclibFailed) = await lrclibResult
+        let (match, neteaseFailed) = await neteaseResult
+        return Fetched(lrclibHits: hits, lrclibFailed: lrclibFailed, netease: match, neteaseFailed: neteaseFailed)
     }
 
-    private func searchLRCLIB(_ query: TrackQuery) async -> [LRCLIBHit] {
-        await Self.attempt("LRCLIB search") { try await self.lrclib.search(query) } ?? []
-    }
-
-    private func searchNetEase(_ query: TrackQuery) async -> NetEaseMatch? {
-        guard let client = netease else { return nil }
-        let songs = await Self.attempt("NetEase search") { try await client.search(query) } ?? []
-        guard let song = TrackMatcher.best(songs, for: query, candidate: { $0.matchCandidate }) else { return nil }
-        guard let lyrics = await Self.attempt("NetEase lyrics", { try await client.lyrics(id: song.id) }) else {
-            return nil
+    private func searchLRCLIB(_ query: TrackQuery) async -> (hits: [LRCLIBHit], failed: Bool) {
+        guard let hits = await Self.attempt("LRCLIB search", { try await self.lrclib.search(query) }) else {
+            return ([], true)
         }
-        return NetEaseMatch(song: song, lyrics: lyrics)
+        return (hits, false)
     }
 
-    /// Runs one provider call. A thrown error is logged and becomes nil, so the other provider still counts.
+    private func searchNetEase(_ query: TrackQuery) async -> (match: NetEaseMatch?, failed: Bool) {
+        guard let client = netease else { return (nil, false) }
+        guard let songs = await Self.attempt("NetEase search", { try await client.search(query) }) else {
+            return (nil, true)
+        }
+        guard let song = TrackMatcher.best(songs, for: query, candidate: { $0.matchCandidate }) else { return (nil, false) }
+        guard let lyrics = await Self.attempt("NetEase lyrics", { try await client.lyrics(id: song.id) }) else {
+            return (nil, true)
+        }
+        return (NetEaseMatch(song: song, lyrics: lyrics), false)
+    }
+
+    /// Runs one provider call. A thrown error is logged and becomes nil, which the caller records as a failure.
     private static func attempt<T>(_ provider: String, _ work: () async throws -> T) async -> T? {
         do {
             return try await work()
