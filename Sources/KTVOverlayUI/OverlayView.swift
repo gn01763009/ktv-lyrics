@@ -17,6 +17,16 @@ public final class OverlayView: NSView {
         }
     }
 
+    /// Draws a dashed frame around the view so the user can see what they are dragging.
+    public var showsMoveFrame = false {
+        didSet { if showsMoveFrame != oldValue { needsDisplay = true } }
+    }
+
+    private static let moveFrameColor = RGBAColor(hex: 0x0A84FF).nsColor
+    private static let moveFrameInset: CGFloat = 4
+    private static let moveFrameLineWidth: CGFloat = 2
+    private static let moveFrameDash: [CGFloat] = [8, 6]
+
     public override var isOpaque: Bool { false }
 
     public override init(frame frameRect: NSRect) {
@@ -33,6 +43,28 @@ public final class OverlayView: NSView {
         NSColor.clear.set()
         dirtyRect.fill(using: .copy)
         KaraokeRenderer(content: content, settings: settings, canvas: bounds.size).draw()
+        if showsMoveFrame { drawMoveFrame() }
+    }
+
+    private func drawMoveFrame() {
+        let path = NSBezierPath(rect: bounds.insetBy(dx: Self.moveFrameInset, dy: Self.moveFrameInset))
+        path.lineWidth = Self.moveFrameLineWidth
+        path.setLineDash(Self.moveFrameDash, count: Self.moveFrameDash.count, phase: 0)
+        Self.moveFrameColor.setStroke()
+        path.stroke()
+    }
+
+    // MARK: Dragging (the panel ignores these unless it is in move mode)
+
+    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    public override func mouseDragged(with event: NSEvent) {
+        // Screen coordinates grow upward, event deltas grow downward.
+        (window as? OverlayPanel)?.dragBy(CGSize(width: event.deltaX, height: -event.deltaY))
+    }
+
+    public override func mouseUp(with event: NSEvent) {
+        (window as? OverlayPanel)?.endDrag()
     }
 
     /// The view as drawn right now, as a bitmap with a transparent background.

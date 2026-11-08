@@ -95,6 +95,15 @@ import Testing
         #expect(img.touchesLeftOrRightEdge == false)
     }
 
+    @Test @MainActor func moveFrameDrawsOverAnIdleScene() {
+        let view = OverlayView(frame: NSRect(origin: .zero, size: canvas))
+        #expect(RenderedImage(view.snapshot()).maxAlpha == 0)
+        view.showsMoveFrame = true
+        #expect(RenderedImage(view.snapshot()).maxAlpha > 0)
+        view.showsMoveFrame = false
+        #expect(RenderedImage(view.snapshot()).maxAlpha == 0)
+    }
+
     @Test func fitterShrinksOnlyWhenNeeded() {
         #expect(TextFitter.fontSize(for: "短", fontName: "PingFangTC-Semibold", preferred: 46, maxWidth: 1000) == 46)
         #expect(TextFitter.fontSize(for: String(repeating: "長", count: 80), fontName: "PingFangTC-Semibold", preferred: 46, maxWidth: 1000) < 46)
